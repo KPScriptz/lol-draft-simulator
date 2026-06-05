@@ -40,7 +40,7 @@ import {
   Dices, Swords, TreePine, Sparkles, Crosshair, HeartHandshake,
   Trophy, RotateCcw, Skull, Flame, ChevronDown, Castle, Coins, Gauge,
   Shield, Activity, Star, Lock, TriangleAlert, CheckCircle2,
-  Target, Users, Copy, Check
+  Target, Users, Copy, Check, Globe
 } from 'lucide-react';
 
 /* ----------------------------------------------------------------------------
@@ -188,9 +188,63 @@ const ERAS = [
 
 const OPPONENTS = ['T1','G2','GenG','JDG','FNC','DRX','C9','FPX','EDG','RNG','TES','DK','BLG','HLE','KT','100T'];
 
-// Flatten every champ across eras, tag with its era, bucket by role.
-const ALL_CHAMPS = ERAS.flatMap((e) => e.champs.map((c) => ({ ...c, era: e.name, year: e.year })));
+// Home region (environment) of each champion across Runeterra.
+const REGION_OF = {
+  // Top
+  Garen:'Demacia', Singed:'Zaun', Teemo:'Bandle City', Shen:'Ionia', Jax:'Shurima',
+  Rumble:'Bandle City', Maokai:'Shadow Isles', 'Dr. Mundo':'Zaun', Renekton:'Shurima',
+  Camille:'Piltover', Gnar:'Freljord', Sett:'Ionia', Ornn:'Freljord', Darius:'Noxus',
+  Illaoi:'Bilgewater', Riven:'Noxus',
+  // Jungle
+  'Xin Zhao':'Demacia', Warwick:'Zaun', Nunu:'Freljord', Elise:'Shadow Isles', Zac:'Zaun',
+  Vi:'Piltover', 'Lee Sin':'Ionia', "Kha'Zix":'Void', Graves:'Bilgewater', Lillia:'Ionia',
+  Hecarim:'Shadow Isles', "Rek'Sai":'Void', Nidalee:'Shurima',
+  // Mid
+  Annie:'Noxus', 'Twisted Fate':'Bilgewater', Ryze:'Runeterra', Kassadin:'Shurima', Zed:'Ionia',
+  Ahri:'Ionia', Syndra:'Ionia', Cassiopeia:'Noxus', Orianna:'Piltover', LeBlanc:'Noxus',
+  Fizz:'Bilgewater', Diana:'Targon', Ekko:'Zaun',
+  // ADC
+  Tristana:'Bandle City', Sivir:'Shurima', Ashe:'Freljord', Caitlyn:'Piltover', Vayne:'Demacia',
+  Ezreal:'Piltover', Lucian:'Demacia', "Kog'Maw":'Void', Jinx:'Zaun', Twitch:'Zaun',
+  Aphelios:'Targon', Senna:'Shadow Isles', Jhin:'Ionia',
+  // Support
+  Soraka:'Targon', Alistar:'Runeterra', Janna:'Zaun', Zyra:'Ixtal', Sona:'Demacia',
+  Thresh:'Shadow Isles', Lulu:'Bandle City', Rakan:'Ionia', Yuumi:'Bandle City', Bard:'Runeterra',
+  'Tahm Kench':'Runeterra', Morgana:'Demacia',
+};
+
+// Region (environment) metadata — colour theme + flavour for the draft banners.
+const REGIONS = [
+  { id:'Shurima',      name:'Shurima',      grad:'from-amber-400 to-yellow-600',   text:'text-amber-300',   ring:'ring-amber-400/50',   blurb:'Sun-forged emperors and ascended beasts.' },
+  { id:'Zaun',         name:'Zaun',         grad:'from-lime-400 to-green-600',      text:'text-lime-300',    ring:'ring-lime-400/50',    blurb:'Chem-tech, toxins and the gray below.' },
+  { id:'Ionia',        name:'Ionia',        grad:'from-pink-400 to-rose-600',       text:'text-pink-300',    ring:'ring-pink-400/50',    blurb:'Spirit magic and razor-sharp balance.' },
+  { id:'Demacia',      name:'Demacia',      grad:'from-sky-300 to-indigo-500',      text:'text-sky-200',     ring:'ring-sky-300/50',     blurb:'Petricite walls and shining justice.' },
+  { id:'Noxus',        name:'Noxus',        grad:'from-red-500 to-rose-800',        text:'text-red-300',     ring:'ring-red-400/50',     blurb:'Strength above all — take what you can.' },
+  { id:'Piltover',     name:'Piltover',     grad:'from-yellow-300 to-amber-500',    text:'text-yellow-200',  ring:'ring-yellow-300/50',  blurb:'The City of Progress and hextech.' },
+  { id:'Freljord',     name:'Freljord',     grad:'from-cyan-300 to-blue-500',       text:'text-cyan-200',    ring:'ring-cyan-300/50',    blurb:'Three tribes, one endless winter.' },
+  { id:'Bilgewater',   name:'Bilgewater',   grad:'from-teal-400 to-cyan-700',       text:'text-teal-300',    ring:'ring-teal-400/50',    blurb:'Cutthroat port of monster hunters.' },
+  { id:'Shadow Isles', name:'Shadow Isles', grad:'from-emerald-400 to-teal-700',    text:'text-emerald-300', ring:'ring-emerald-400/50', blurb:'The Black Mist and the undead it raises.' },
+  { id:'Targon',       name:'Targon',       grad:'from-violet-400 to-indigo-600',   text:'text-violet-300',  ring:'ring-violet-400/50',  blurb:'Aspects descended from the celestial peak.' },
+  { id:'Void',         name:'Void',         grad:'from-purple-500 to-fuchsia-800',  text:'text-purple-300',  ring:'ring-purple-400/50',  blurb:'Hunger from beyond reality itself.' },
+  { id:'Ixtal',        name:'Ixtal',        grad:'from-green-400 to-emerald-700',   text:'text-green-300',   ring:'ring-green-400/50',   blurb:'Hidden elementalists of the deep jungle.' },
+  { id:'Bandle City',  name:'Bandle City',  grad:'from-fuchsia-400 to-pink-600',    text:'text-fuchsia-300', ring:'ring-fuchsia-400/50', blurb:'Whimsical, chaotic home of the yordles.' },
+  { id:'Runeterra',    name:'Wanderers',    grad:'from-slate-300 to-slate-500',     text:'text-slate-200',   ring:'ring-slate-300/50',   blurb:'Drifters with no homeland to call their own.' },
+];
+const REGION_MAP = Object.fromEntries(REGIONS.map((r) => [r.id, r]));
+
+// Flatten every champ across eras, tag with its era + home region, bucket by role.
+const ALL_CHAMPS = ERAS.flatMap((e) => e.champs.map((c) => ({ ...c, era: e.name, year: e.year, region: REGION_OF[c.n] || 'Runeterra' })));
 const POOL = Object.fromEntries(ROLES.map((r) => [r.id, ALL_CHAMPS.filter((c) => c.r === r.id)]));
+
+// A region's champion roster: one (highest-power) version of each name, ranked by win rate.
+function regionRoster(regionId) {
+  const byName = {};
+  for (const c of ALL_CHAMPS) {
+    if (c.region !== regionId) continue;
+    if (!byName[c.n] || c.p > byName[c.n].p) byName[c.n] = c;
+  }
+  return Object.values(byName).sort((a, b) => champWinRate(b) - champWinRate(a));
+}
 
 // ---- math helpers ----------------------------------------------------------
 const randInt = (n) => Math.floor(Math.random() * n);
@@ -288,18 +342,24 @@ function evalComp(champs) {
 
 const ROLE_LABEL = { Top: 'Top laners', Jungle: 'Junglers', Mid: 'Mid laners', ADC: 'ADCs', Support: 'Supports' };
 
-// Deal k unique-by-name champions for a role, ranked by win rate (best first).
-function rollRole(roleId, k = 5) {
-  const a = [...POOL[roleId]];
-  const seen = new Set();
-  const out = [];
-  while (a.length && out.length < k) {
-    const c = a.splice(randInt(a.length), 1)[0];
-    if (seen.has(c.n)) continue;
-    seen.add(c.n);
-    out.push(c);
-  }
-  return out.sort((x, y) => champWinRate(y) - champWinRate(x));
+// Roll a random region whose roster can still fill at least one open role.
+// Weighted by how many of its champions fit your open roles, so you usually
+// get real choices — but you're stuck with whatever that environment offers.
+function rollRegion(openRoles, excludeId) {
+  const open = new Set(openRoles);
+  let elig = REGIONS
+    .map((rg) => {
+      const roster = regionRoster(rg.id);
+      return { rg, roster, openCount: roster.filter((c) => open.has(c.r)).length };
+    })
+    .filter((e) => e.openCount > 0);
+  if (excludeId && elig.length > 1) elig = elig.filter((e) => e.rg.id !== excludeId);
+
+  const total = elig.reduce((s, e) => s + e.openCount, 0);
+  let t = Math.random() * total;
+  let chosen = elig[0];
+  for (const e of elig) { t -= e.openCount; if (t <= 0) { chosen = e; break; } }
+  return { region: chosen.rg.id, options: chosen.roster };
 }
 
 // A fresh CPU enemy team — one champ per role, avoiding a mirror of your pick.
@@ -464,6 +524,11 @@ function RosterSlot({ role, champ }) {
           <Avatar champ={champ} />
           <div className="text-center">
             <div className="text-sm font-bold leading-tight">{champ.n}</div>
+            {champ.region && REGION_MAP[champ.region] && (
+              <div className={`mt-0.5 text-[9px] font-semibold uppercase tracking-wide ${REGION_MAP[champ.region].text}`}>
+                {REGION_MAP[champ.region].name}
+              </div>
+            )}
             <div className={`mt-1 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-bold ${ratingTone(champ.p)}`}>
               {champWinRate(champ).toFixed(1)}%
             </div>
@@ -479,20 +544,28 @@ function RosterSlot({ role, champ }) {
 }
 
 // ---- a single ranked champion row in the roll list -------------------------
-function ChampRow({ champ, rank, onPick }) {
+function ChampRow({ champ, rank, onPick, disabled }) {
   const wr = champWinRate(champ);
   const fill = Math.max(6, Math.min(100, ((wr - 44) / 14) * 100));
   const role = ROLE_MAP[champ.r];
+  const RoleIcon = role.Icon;
   const tags = champTags(champ);
   return (
     <button
-      onClick={onPick}
-      className={`group flex items-center gap-3 rounded-2xl border border-slate-700 bg-slate-900/70 p-3 text-left transition-all hover:translate-x-0.5 hover:bg-slate-900 hover:ring-2 ${role.ring}`}>
+      onClick={disabled ? undefined : onPick}
+      disabled={disabled}
+      className={`group flex items-center gap-3 rounded-2xl border p-3 text-left transition-all
+        ${disabled
+          ? 'cursor-not-allowed border-slate-800 bg-slate-900/30 opacity-45'
+          : `border-slate-700 bg-slate-900/70 hover:translate-x-0.5 hover:bg-slate-900 hover:ring-2 ${role.ring}`}`}>
       <span className="w-4 shrink-0 text-center text-sm font-black text-slate-600">{rank}</span>
       <Avatar champ={champ} size="sm" />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <span className="truncate text-sm font-bold text-slate-100">{champ.n}</span>
+          <span className={`inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide ${role.chip}`}>
+            <RoleIcon className="h-3 w-3" /> {role.id}
+          </span>
         </div>
         <div className="mt-0.5 flex flex-wrap items-center gap-1">
           {tags.map((t, i) => (
@@ -507,7 +580,9 @@ function ChampRow({ champ, rank, onPick }) {
         <div className={`text-base font-black leading-none ${wr >= 51 ? 'text-emerald-300' : 'text-slate-200'}`}>{wr.toFixed(1)}%</div>
         <div className="mt-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">win rate</div>
       </div>
-      <Lock className="h-4 w-4 shrink-0 text-slate-600 transition group-hover:text-slate-300" />
+      {disabled
+        ? <span className="shrink-0 text-[9px] font-bold uppercase leading-tight tracking-wide text-slate-500">{role.id}<br/>filled</span>
+        : <Lock className="h-4 w-4 shrink-0 text-slate-600 transition group-hover:text-slate-300" />}
     </button>
   );
 }
@@ -567,7 +642,7 @@ function ChallengeBanner({ challenge, onDismiss }) {
 // ---- the one and only app component ----------------------------------------
 function DraftSimulator() {
   const [roster, setRoster] = useState({ Top: null, Jungle: null, Mid: null, ADC: null, Support: null });
-  const [roll, setRoll] = useState(null);            // { role, options:[champ x5] }
+  const [roll, setRoll] = useState(null);            // { region, options:[region roster] }
   const [rerollUsed, setRerollUsed] = useState(false); // one reroll per run
   const [phase, setPhase] = useState('draft');        // 'draft' | 'result'
   const [result, setResult] = useState(null);
@@ -577,26 +652,18 @@ function DraftSimulator() {
   const emptyRoles = ROLES.filter((r) => !roster[r.id]).map((r) => r.id);
   const filled = 5 - emptyRoles.length;
   const complete = emptyRoles.length === 0;
-  const nextRole = emptyRoles[0];
 
-  function rollPatch() {
-    if (!nextRole) return;
-    setRoll({ role: nextRole, options: rollRole(nextRole, 5) });
+  function rollEnv() {
+    if (complete) return;
+    setRoll(rollRegion(emptyRoles));
   }
-  function rerollChampions() {
+  function rerollEnv() {
     if (rerollUsed || !roll) return;
-    setRoll({ role: roll.role, options: rollRole(roll.role, 5) });
-    setRerollUsed(true);
-  }
-  function rerollRole() {
-    if (rerollUsed || !roll) return;
-    const others = emptyRoles.filter((r) => r !== roll.role);
-    if (!others.length) return;
-    const role = others[randInt(others.length)];
-    setRoll({ role, options: rollRole(role, 5) });
+    setRoll(rollRegion(emptyRoles, roll.region));
     setRerollUsed(true);
   }
   function lockIn(champ) {
+    if (roster[champ.r]) return; // role already filled
     setRoster((prev) => ({ ...prev, [champ.r]: champ }));
     setRoll(null);
   }
@@ -657,7 +724,7 @@ function DraftSimulator() {
             DRAFT SIMULATOR
           </h1>
           <p className="mt-2 text-sm font-medium tracking-wide text-slate-400 sm:text-base">
-            Build a comp that <span className="font-bold text-sky-300">synergizes</span>. Out-draft the enemy team. Chase the <span className="font-bold text-amber-300">18-0 split.</span>
+            Draft from the <span className="font-bold text-sky-300">regions of Runeterra</span>. Make a comp work with what each environment gives you. Chase the <span className="font-bold text-amber-300">18-0 split.</span>
           </p>
         </header>
 
@@ -686,35 +753,43 @@ function DraftSimulator() {
                 /* ---- Roll gate ---- */
                 <div className="flex flex-col items-center gap-4">
                   <button
-                    onClick={rollPatch}
+                    onClick={rollEnv}
                     className="group relative inline-flex items-center gap-3 overflow-hidden rounded-2xl bg-gradient-to-r from-sky-500 to-blue-600 px-7 py-3.5 text-base font-bold uppercase tracking-wide text-white shadow-lg shadow-sky-500/30 transition-all hover:scale-[1.03] hover:shadow-sky-500/50 active:scale-95">
-                    <Dices className="h-5 w-5 transition-transform group-hover:rotate-12" />
-                    Roll {ROLE_LABEL[nextRole]}
+                    <Globe className="h-5 w-5 transition-transform group-hover:rotate-12" />
+                    Roll a Region
                     <span className="absolute inset-0 -translate-x-full bg-white/20 transition-transform duration-500 group-hover:translate-x-full" />
                   </button>
                   <p className="max-w-md text-center text-sm text-slate-500">
-                    Deals <span className="font-semibold text-slate-300">5 random {ROLE_LABEL[nextRole].toLowerCase()}</span>, ranked by win rate. But win rate doesn't win games — <span className="text-slate-300">check the comp tags</span> and build a balanced team.
+                    Reveals a random <span className="font-semibold text-slate-300">region of Runeterra</span> and its champions. Pick one for an <span className="text-slate-300">open role</span> — you're stuck with whatever that environment offers, so balance your comp across regions.
                   </p>
+                  <span className="inline-flex flex-wrap items-center justify-center gap-1.5 text-[11px] font-semibold uppercase tracking-widest text-slate-500">
+                    Open roles:
+                    {emptyRoles.map((r) => (
+                      <span key={r} className={`rounded px-1.5 py-0.5 ${ROLE_MAP[r].chip}`}>{r}</span>
+                    ))}
+                  </span>
                   <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-700 bg-slate-900/60 px-3 py-1 text-[11px] font-semibold uppercase tracking-widest text-slate-400">
                     {rerollUsed
                       ? (<><Lock className="h-3 w-3" /> Reroll spent this run</>)
-                      : (<><RotateCcw className="h-3 w-3 text-emerald-300" /> 1 reroll available</>)}
+                      : (<><RotateCcw className="h-3 w-3 text-emerald-300" /> 1 region reroll available</>)}
                   </span>
                 </div>
               ) : (
                 /* ---- Roll resolved ---- */
                 <div>
                   {(() => {
-                    const role = ROLE_MAP[roll.role];
-                    const RoleIcon = role.Icon;
+                    const rg = REGION_MAP[roll.region];
+                    const openSet = new Set(emptyRoles);
+                    const pickable = roll.options.filter((c) => openSet.has(c.r)).length;
                     return (
                       <div className="mb-4 flex flex-wrap items-center gap-3">
-                        <div className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-gradient-to-br ${role.grad} text-slate-950 shadow-lg ${role.glow}`}>
-                          <RoleIcon className="h-5 w-5" strokeWidth={2.5} />
+                        <div className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-gradient-to-br ${rg.grad} text-slate-950 shadow-lg`}>
+                          <Globe className="h-5 w-5" strokeWidth={2.5} />
                         </div>
-                        <div>
-                          <div className={`text-xs font-semibold uppercase tracking-widest ${role.text}`}>Rolling · {role.id}</div>
-                          <div className="text-lg font-bold text-slate-100">5 {ROLE_LABEL[roll.role].toLowerCase()} · pick for your comp</div>
+                        <div className="min-w-0">
+                          <div className={`text-xs font-semibold uppercase tracking-widest ${rg.text}`}>Rolled Region</div>
+                          <div className="text-lg font-bold text-slate-100">{rg.name} · {pickable} pick{pickable === 1 ? '' : 's'} for open roles</div>
+                          <div className="text-xs text-slate-500">{rg.blurb}</div>
                         </div>
                       </div>
                     );
@@ -722,7 +797,7 @@ function DraftSimulator() {
 
                   <div className="grid gap-2">
                     {roll.options.map((champ, idx) => (
-                      <ChampRow key={idx} champ={champ} rank={idx + 1} onPick={() => lockIn(champ)} />
+                      <ChampRow key={idx} champ={champ} rank={idx + 1} onPick={() => lockIn(champ)} disabled={!!roster[champ.r]} />
                     ))}
                   </div>
 
@@ -731,23 +806,17 @@ function DraftSimulator() {
                       <div className="flex flex-wrap items-center justify-center gap-2">
                         <span className="text-xs font-semibold uppercase tracking-widest text-emerald-300">1 reroll left:</span>
                         <button
-                          onClick={rerollChampions}
-                          className="inline-flex items-center gap-2 rounded-xl border border-emerald-400/40 bg-emerald-500/10 px-4 py-2 text-sm font-bold text-emerald-200 transition hover:bg-emerald-500/20 active:scale-95">
-                          <RotateCcw className="h-4 w-4" /> Reroll champions
-                        </button>
-                        <button
-                          onClick={rerollRole}
-                          disabled={emptyRoles.length < 2}
-                          className="inline-flex items-center gap-2 rounded-xl border border-sky-400/40 bg-sky-500/10 px-4 py-2 text-sm font-bold text-sky-200 transition hover:bg-sky-500/20 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40">
-                          <Dices className="h-4 w-4" /> Reroll role
+                          onClick={rerollEnv}
+                          className="inline-flex items-center gap-2 rounded-xl border border-sky-400/40 bg-sky-500/10 px-4 py-2 text-sm font-bold text-sky-200 transition hover:bg-sky-500/20 active:scale-95">
+                          <Globe className="h-4 w-4" /> Reroll region
                         </button>
                       </div>
                     ) : (
                       <span className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-widest text-slate-500">
-                        <Lock className="h-3 w-3" /> Reroll spent — lock a {roll.role} to continue
+                        <Lock className="h-3 w-3" /> Reroll spent — lock a pick to continue
                       </span>
                     )}
-                    <p className="text-center text-xs text-slate-500">You must lock a pick before you can roll the next role.</p>
+                    <p className="text-center text-xs text-slate-500">Pick a champion for an open role. You must lock a pick before you can roll a new region.</p>
                   </div>
                 </div>
               )
