@@ -903,6 +903,35 @@ function ResultPanel({ result, roster, challenge, openGame, setOpenGame, restart
   const swept = losses === 0;
   const winPct = Math.round((wins / 18) * 100);
 
+  // per-game team averages across the whole split (game-log averages)
+  const avg = (() => {
+    const n = games.length || 1;
+    let k = 0, d = 0, a = 0, cs = 0, tow = 0, drk = 0, bar = 0, gold = 0;
+    for (const g of games) {
+      k += g.your.k; d += g.your.d; a += g.your.a;
+      cs += g.your.players.reduce((s, p) => s + (p.cs || 0), 0);
+      tow += g.your.obj.towers; drk += g.your.obj.drakes; bar += g.your.obj.barons;
+      gold += g.your.gold;
+    }
+    const r = (x) => Math.round(x);
+    const d1 = (x) => x.toFixed(1);
+    return {
+      kda: `${r(k / n)}/${r(d / n)}/${r(a / n)}`,
+      ratio: (((k + a) / Math.max(1, d))).toFixed(1),
+      cs: r(cs / n),
+      drk: d1(drk / n), bar: d1(bar / n), tow: d1(tow / n),
+      gold: (gold / n / 1000).toFixed(1) + 'k',
+    };
+  })();
+  const avgTiles = [
+    { Icon: Swords, label: 'Avg KDA', value: avg.kda },
+    { Icon: Target, label: 'Avg CS',  value: avg.cs },
+    { Icon: Flame,  label: 'Dragons', value: avg.drk },
+    { Icon: Skull,  label: 'Barons',  value: avg.bar },
+    { Icon: Castle, label: 'Towers',  value: avg.tow },
+    { Icon: Coins,  label: 'Gold',    value: avg.gold },
+  ];
+
   const cName = challenge ? (challenge.n || 'Your friend') : null;
   const cw = challenge ? challenge.rec[0] : null;
   const cl = challenge ? challenge.rec[1] : null;
@@ -937,7 +966,21 @@ function ResultPanel({ result, roster, challenge, openGame, setOpenGame, restart
             {wins}-{losses}
           </div>
           <div className="mt-2 text-sm font-medium text-slate-400">
-            {winPct}% series win rate · Team Rating <span className="font-bold text-slate-200">{rating}</span>
+            {winPct}% series win rate · Team Rating <span className="font-bold text-slate-200">{rating}</span> · Avg KDA ratio <span className="font-bold text-slate-200">{avg.ratio}</span>
+          </div>
+
+          {/* Split averages across the game log */}
+          <div className="mx-auto mt-5 max-w-2xl">
+            <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.25em] text-slate-500">Split Averages · Per Game</div>
+            <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+              {avgTiles.map((s) => (
+                <div key={s.label} className="rounded-xl border border-slate-800 bg-slate-950/50 px-2 py-2.5 text-center">
+                  <s.Icon className="mx-auto mb-1 h-4 w-4 text-slate-500" strokeWidth={2} />
+                  <div className="text-sm font-bold tabular-nums text-slate-100">{s.value}</div>
+                  <div className="text-[10px] font-medium uppercase tracking-wide text-slate-500">{s.label}</div>
+                </div>
+              ))}
+            </div>
           </div>
 
           {challenge && (
