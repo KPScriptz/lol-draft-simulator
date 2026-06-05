@@ -3,12 +3,12 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>LoL Draft Simulator — 18-0 Split</title>
-  <meta name="description" content="Roll broken historic LoL patches, draft Wilt-tier champions, and force the 18-0 split. Then challenge your friends to beat your record." />
+  <title>LoL Draft Simulator — Build the Comp, Sim the Split</title>
+  <meta name="description" content="Draft a 5-role League comp from historic patches, then simulate a full split against CPU teams with live KDA, CS, dragons, baron and towers. Highest win rate doesn't win — synergy does. Then challenge your friends." />
   <meta name="theme-color" content="#0f172a" />
   <meta property="og:type" content="website" />
-  <meta property="og:title" content="LoL Draft Simulator — 18-0 Split" />
-  <meta property="og:description" content="Roll broken patches, draft Wilt-tier champions, and force the 18-0 split. Can you beat my record?" />
+  <meta property="og:title" content="LoL Draft Simulator — Build the Comp, Sim the Split" />
+  <meta property="og:description" content="Draft a comp, out-draft the enemy team, and sim a full split with real scoreboards. Can you beat my record?" />
   <script src="https://cdn.tailwindcss.com"></script>
   <script>tailwind.config = { darkMode: 'class' }</script>
   <style>
@@ -34,19 +34,22 @@
   <div id="root"></div>
 
   <script type="text/babel" data-type="module" data-presets="react">
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
   Dices, Swords, TreePine, Sparkles, Crosshair, HeartHandshake,
-  Trophy, Crown, RotateCcw, Skull, Flame, ChevronDown,
-  Shield, Activity, Star, Lock, TriangleAlert,
+  Trophy, RotateCcw, Skull, Flame, ChevronDown, Castle, Coins, Gauge,
+  Shield, Activity, Star, Lock, TriangleAlert, CheckCircle2,
   Target, Users, Copy, Check
 } from 'lucide-react';
 
 /* ----------------------------------------------------------------------------
-   LoL Draft Simulator — "18-0 Split"
-   A single self-contained component. Everything below the component is just a
-   one-line mount harness so it runs in the browser with zero build step.
+   LoL Draft Simulator — draft a comp, sim a split.
+   Single self-contained component. Match outcomes are decided by TEAM
+   COMPOSITION (damage, frontline, engage, AD/AP balance) versus a freshly
+   drafted CPU enemy team each game — NOT by raw champion win rate. Every game
+   produces a full scoreboard: per-player KDA + CS, plus dragons, baron, towers
+   and gold. The one-line mount at the bottom runs it with zero build step.
 ---------------------------------------------------------------------------- */
 
 const ROLES = [
@@ -58,17 +61,16 @@ const ROLES = [
 ];
 const ROLE_MAP = Object.fromEntries(ROLES.map(r => [r.id, r]));
 
-// Each era covers all 5 roles. `w: true` flags a "Wilt Chamberlain Tier" champ
-// whose 99 rating breaks the simulation math and forces an 18-0 sweep.
+// Historic patches, each covering all 5 roles. `p` is a power rating used only
+// as a flavor "win rate" — it does NOT decide matches by itself.
 const ERAS = [
   {
     id: 's1', name: 'Season 1 Release', year: '2009',
-    blurb: 'Before balance was invented. Numbers were a suggestion.',
     champs: [
       { n: 'Garen',        r: 'Top',     p: 88, t: 'Spin to win — items optional.' },
       { n: 'Singed',       r: 'Top',     p: 84, t: 'Proxy poison the entire map.' },
       { n: 'Teemo',        r: 'Top',     p: 80, t: 'Shrooms predate vision rules.' },
-      { n: 'Xin Zhao',     r: 'Jungle',  p: 99, w: true, t: 'Release Xin: 3-item all-in by minute six.' },
+      { n: 'Xin Zhao',     r: 'Jungle',  p: 90, t: 'Release Xin: 3-item all-in by minute six.' },
       { n: 'Warwick',      r: 'Jungle',  p: 82, t: 'Infinite sustain, free ganks.' },
       { n: 'Nunu',         r: 'Jungle',  p: 78, t: 'Smite, clear, repeat.' },
       { n: 'Annie',        r: 'Mid',     p: 85, t: 'Tibbers one-shots the lobby.' },
@@ -84,9 +86,8 @@ const ERAS = [
   },
   {
     id: 's3', name: 'Season 3', year: '2013',
-    blurb: 'So broken Riot perma-banned him at Worlds.',
     champs: [
-      { n: 'Kassadin',     r: 'Mid',     p: 99, w: true, t: 'S3 Kass: Riftwalk one-shot, perma-banned.' },
+      { n: 'Kassadin',     r: 'Mid',     p: 92, t: 'S3 Kass: Riftwalk one-shot, perma-banned.' },
       { n: 'Zed',          r: 'Mid',     p: 90, t: 'Press R, win the game.' },
       { n: 'Ahri',         r: 'Mid',     p: 84, t: 'Charm equals kill.' },
       { n: 'Shen',         r: 'Top',     p: 84, t: 'Global ult babysitter.' },
@@ -105,7 +106,6 @@ const ERAS = [
   },
   {
     id: 'p420', name: 'Patch 4.20 Weedwick', year: '2014',
-    blurb: '420 blaze it — Warwick reborn as a lifesteal lord.',
     champs: [
       { n: 'Warwick',      r: 'Jungle',  p: 90, t: 'Weedwick: heals through your team.' },
       { n: 'Lee Sin',      r: 'Jungle',  p: 88, t: 'Insec or int — no in-between.' },
@@ -126,7 +126,6 @@ const ERAS = [
   },
   {
     id: 's7', name: 'Season 7 Ardent Censer', year: '2017',
-    blurb: 'Touch your ADC, win the game. The enchanter apocalypse.',
     champs: [
       { n: 'Janna',        r: 'Support', p: 95, t: 'Ardent shield-bot, untouchable.' },
       { n: 'Lulu',         r: 'Support', p: 93, t: 'Pix + shield = invincible carry.' },
@@ -147,9 +146,8 @@ const ERAS = [
   },
   {
     id: 'aphelios', name: '2020 "200 Years" Aphelios', year: '2020',
-    blurb: 'It allegedly took Riot 200 years to balance him. It did not work.',
     champs: [
-      { n: 'Aphelios',     r: 'ADC',     p: 99, w: true, t: '200 Years: five guns, zero counterplay.' },
+      { n: 'Aphelios',     r: 'ADC',     p: 93, t: '200 Years: five guns, zero counterplay.' },
       { n: 'Senna',        r: 'ADC',     p: 90, t: 'Souls scale to infinity.' },
       { n: 'Ezreal',       r: 'ADC',     p: 86, t: 'Mythic-spam safe poke.' },
       { n: 'Yuumi',        r: 'Support', p: 92, t: 'Press R — you cannot lose lane.' },
@@ -168,7 +166,6 @@ const ERAS = [
   },
   {
     id: 's6', name: 'Season 6 Assassin Update', year: '2016',
-    blurb: 'Lethality + Duskblade turned mid lane into a coin flip.',
     champs: [
       { n: 'LeBlanc',      r: 'Mid',     p: 92, t: 'Distortion in, delete, vanish.' },
       { n: 'Zed',          r: 'Mid',     p: 90, t: 'Shadow assassin prime.' },
@@ -191,41 +188,104 @@ const ERAS = [
 
 const OPPONENTS = ['T1','G2','GenG','JDG','FNC','DRX','C9','FPX','EDG','RNG','TES','DK','BLG','HLE','KT','100T'];
 
-// Flatten every champ across eras, tag with its era, and bucket by role so a
-// single roll can deal 5 champions for one role.
+// Flatten every champ across eras, tag with its era, bucket by role.
 const ALL_CHAMPS = ERAS.flatMap((e) => e.champs.map((c) => ({ ...c, era: e.name, year: e.year })));
 const POOL = Object.fromEntries(ROLES.map((r) => [r.id, ALL_CHAMPS.filter((c) => c.r === r.id)]));
 
-// ---- helpers ---------------------------------------------------------------
+// ---- math helpers ----------------------------------------------------------
 const randInt = (n) => Math.floor(Math.random() * n);
-function sample(arr, k) {
-  const a = [...arr];
-  const out = [];
-  while (a.length && out.length < k) out.push(a.splice(randInt(a.length), 1)[0]);
-  return out;
-}
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+const clampInt = (v, lo, hi) => Math.max(lo, Math.min(hi, Math.round(v)));
 function initials(name) {
   const parts = name.replace(/[^A-Za-z ']/g, '').split(' ').filter(Boolean);
   if (parts.length > 1) return (parts[0][0] + parts[1][0]).toUpperCase();
   return name.slice(0, 2).toUpperCase();
 }
 function ratingTone(p) {
-  if (p >= 99) return 'text-yellow-300 border-yellow-300/60 bg-yellow-400/10';
-  if (p >= 90) return 'text-amber-300 border-amber-300/50 bg-amber-400/10';
-  if (p >= 82) return 'text-sky-300 border-sky-300/50 bg-sky-400/10';
+  if (p >= 92) return 'text-amber-300 border-amber-300/50 bg-amber-400/10';
+  if (p >= 86) return 'text-sky-300 border-sky-300/50 bg-sky-400/10';
   return 'text-slate-300 border-slate-400/40 bg-slate-400/10';
 }
 
-// Realistic-feeling "real-world win rate" derived from the power rating, with a
-// small deterministic per-champ wobble so the ranking isn't a perfect mirror of
-// power. Stable for a given champ (name + rating), so it survives challenge links.
+// Deterministic 0..1 value from a string + salt (stable for challenge links).
+function hash01(str, salt) {
+  let h = (2166136261 ^ salt) >>> 0;
+  for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
+  h ^= h >>> 13; h = Math.imul(h, 0x5bd1e995); h ^= h >>> 15;
+  return ((h >>> 0) % 100000) / 100000;
+}
+
+// Flavor "real-world win rate" derived from power, with a stable per-champ wobble.
 function champWinRate(c) {
-  const base = 47 + ((c.p - 70) / 29) * 7; // ~47% .. ~54%
-  let h = 0;
-  for (let i = 0; i < c.n.length; i++) h = (h * 31 + c.n.charCodeAt(i)) >>> 0;
-  const jitter = (((h % 1000) / 1000) - 0.5) * 2.4; // +/- 1.2%
+  const base = 47 + ((c.p - 70) / 29) * 7;
+  const jitter = (hash01(c.n, 7) - 0.5) * 2.4;
   return Math.round((base + jitter) * 10) / 10;
 }
+
+// Role baselines for the composition model. Per-champ values jitter around these.
+const ROLE_BASE = {
+  Top:     { dmg: 0.55, tank: 0.78, cc: 0.50, ap: 0.30, scale: 0.55, csRate: 8.0 },
+  Jungle:  { dmg: 0.58, tank: 0.55, cc: 0.64, scale: 0.52, ap: 0.45, csRate: 5.4 },
+  Mid:     { dmg: 0.80, tank: 0.32, cc: 0.46, ap: 0.72, scale: 0.62, csRate: 8.6 },
+  ADC:     { dmg: 0.88, tank: 0.22, cc: 0.18, ap: 0.08, scale: 0.88, csRate: 9.2 },
+  Support: { dmg: 0.28, tank: 0.52, cc: 0.86, ap: 0.55, scale: 0.35, csRate: 1.6 },
+};
+
+// Per-champion combat attributes (0..1), deterministic from name + role + power.
+function champAttrs(c) {
+  const b = ROLE_BASE[c.r];
+  const power = (c.p - 80) / 20; // ~ -0.1 .. 1
+  const j = (base, salt) => clamp(base + (hash01(c.n, salt) - 0.5) * 0.34, 0.05, 0.98);
+  return {
+    dmg:   clamp(j(b.dmg, 11) + power * 0.06, 0.05, 0.99),
+    tank:  j(b.tank, 22),
+    cc:    j(b.cc, 33),
+    ap:    j(b.ap, 44),    // 0 = full AD, 1 = full AP
+    scale: j(b.scale, 55), // 0 = early, 1 = late
+    csRate: b.csRate,
+  };
+}
+
+// Short descriptive tags so players can draft for COMPOSITION, not just win rate.
+function champTags(c) {
+  const a = champAttrs(c);
+  const tags = [{ k: a.ap >= 0.5 ? 'AP' : 'AD', tone: a.ap >= 0.5 ? 'bg-sky-500/15 text-sky-300' : 'bg-orange-500/15 text-orange-300' }];
+  if (a.tank >= 0.62) tags.push({ k: 'Frontline', tone: 'bg-emerald-500/15 text-emerald-300' });
+  if (a.cc >= 0.62)   tags.push({ k: 'Engage',    tone: 'bg-fuchsia-500/15 text-fuchsia-300' });
+  if (a.dmg >= 0.74)  tags.push({ k: 'Carry',     tone: 'bg-amber-500/15 text-amber-300' });
+  if (a.scale >= 0.7) tags.push({ k: 'Scales',    tone: 'bg-violet-500/15 text-violet-300' });
+  return tags.slice(0, 3);
+}
+
+// Evaluate a 5-champ team into a 0..100 rating + sub-scores + comp flaws.
+function evalComp(champs) {
+  const attrs = champs.map(champAttrs);
+  const sum = (k) => attrs.reduce((s, a) => s + a[k], 0);
+  const avgPower = champs.reduce((s, c) => s + c.p, 0) / champs.length;
+
+  const apShare = sum('ap') / champs.length;        // 0..1
+  const mixPenalty = Math.abs(apShare - 0.5);       // 0 ideal .. 0.5 worst
+
+  const rPower   = clamp((avgPower - 78) / 16, 0, 1);
+  const rDamage  = clamp(sum('dmg') / 3.6, 0, 1);
+  const rFront   = clamp(sum('tank') / 2.8, 0, 1);
+  const rEngage  = clamp(sum('cc') / 3.0, 0, 1);
+  const rBalance = clamp(1 - mixPenalty * 1.8, 0, 1);
+
+  // Comp matters more than raw power in aggregate.
+  const score01 =
+    rPower * 0.30 + rDamage * 0.18 + rFront * 0.19 + rEngage * 0.18 + rBalance * 0.15;
+
+  const flaws = [];
+  if (rFront < 0.34)  flaws.push('No frontline — your carries get blown up in fights');
+  if (rEngage < 0.32) flaws.push('No engage — you can never start a fight on your terms');
+  if (rDamage < 0.36) flaws.push('Not enough damage to actually close games');
+  if (mixPenalty > 0.32) flaws.push(apShare > 0.5 ? 'All-AP — the enemy just stacks magic resist' : 'All-AD — the enemy just stacks armor');
+
+  const rating = clamp(score01 - flaws.length * 0.06, 0.05, 1) * 100;
+  return { rating, sub: { power: rPower, damage: rDamage, front: rFront, engage: rEngage, balance: rBalance }, apShare, flaws };
+}
+
 const ROLE_LABEL = { Top: 'Top laners', Jungle: 'Junglers', Mid: 'Mid laners', ADC: 'ADCs', Support: 'Supports' };
 
 // Deal k unique-by-name champions for a role, ranked by win rate (best first).
@@ -242,16 +302,106 @@ function rollRole(roleId, k = 5) {
   return out.sort((x, y) => champWinRate(y) - champWinRate(x));
 }
 
+// A fresh CPU enemy team — one champ per role, avoiding a mirror of your pick.
+function randomEnemyTeam(yourNamesByRole) {
+  return ROLES.map((r) => {
+    const filtered = POOL[r.id].filter((c) => c.n !== yourNamesByRole[r.id]);
+    const pool = filtered.length ? filtered : POOL[r.id];
+    return pool[randInt(pool.length)];
+  });
+}
+
+// ---- per-game stat generation ---------------------------------------------
+// Spread an integer total across weights, proportionally, remainder to top fracs.
+function distribute(total, weights) {
+  const sumW = weights.reduce((a, b) => a + b, 0) || 1;
+  const raw = weights.map((w) => (total * w) / sumW);
+  const out = raw.map(Math.floor);
+  let rem = total - out.reduce((a, b) => a + b, 0);
+  const fr = raw.map((v, i) => [v - Math.floor(v), i]).sort((a, b) => b[0] - a[0]);
+  for (let i = 0; i < rem; i++) out[fr[i % fr.length][1]]++;
+  return out;
+}
+
+const KILL_ROLE = { Top: 0.85, Jungle: 0.95, Mid: 1.15, ADC: 1.35, Support: 0.3 };
+
+function genTeamStats(champs, teamKills, teamDeaths, teamAssists, isWinner, dur) {
+  const attrs = champs.map(champAttrs);
+  const killW   = champs.map((c, i) => (0.35 + attrs[i].dmg) * KILL_ROLE[c.r] * (0.7 + hash01(c.n, 70 + i)));
+  const assistW = champs.map((c, i) => (0.5 + attrs[i].cc + (c.r === 'Support' ? 0.9 : 0)) * (0.7 + hash01(c.n, 80 + i)));
+  const deathW  = champs.map((c, i) => (0.6 + attrs[i].tank * 0.8 + (c.r === 'Support' ? 0.25 : 0)) * (0.7 + hash01(c.n, 90 + i)));
+  const kills = distribute(teamKills, killW);
+  const assists = distribute(teamAssists, assistW);
+  const deaths = distribute(teamDeaths, deathW);
+  return champs.map((c, i) => {
+    const csPerMin = ROLE_BASE[c.r].csRate * (isWinner ? 1.06 : 0.94) * (0.86 + hash01(c.n, 100 + i) * 0.28);
+    const cs = Math.round(csPerMin * dur + (c.r === 'Jungle' ? dur * 0.7 : 0));
+    return { champ: c, k: kills[i], d: deaths[i], a: assists[i], cs };
+  });
+}
+
+function genObjectives(win, dominance, dur) {
+  if (win) {
+    return {
+      towers: clampInt(6 + dominance * 5 + randInt(2), 4, 11),
+      drakes: clampInt(2 + randInt(3), 1, 5),
+      barons: dur > 26 ? 1 + randInt(2) : randInt(2),
+    };
+  }
+  return {
+    towers: clampInt(randInt(5) + dominance, 0, 7),
+    drakes: randInt(3),
+    barons: dur > 32 ? randInt(2) : 0,
+  };
+}
+
+function teamGold(players, obj, dur) {
+  const cs = players.reduce((s, p) => s + p.cs, 0);
+  const k = players.reduce((s, p) => s + p.k, 0);
+  const a = players.reduce((s, p) => s + p.a, 0);
+  return Math.round(2400 * 5 * (dur / 32) + cs * 20 + k * 300 + a * 75 + obj.towers * 330 + obj.drakes * 220 + obj.barons * 900);
+}
+
+const pogScore = (p) => p.k * 3 + p.a - p.d + p.cs * 0.02;
+
+function buildGame(i, yourChamps, enemyChamps, win, dominance) {
+  const dur = clampInt((win ? 38 - dominance * 12 : 40 - dominance * 9) + (Math.random() * 6 - 3), 19, 47);
+  const winnerKills = clampInt(15 + dominance * 22 + randInt(8), 10, 52);
+  const loserKills  = clampInt(7 + (1 - dominance) * 12 + randInt(6), 2, 26);
+  const yK = win ? winnerKills : loserKills;
+  const eK = win ? loserKills : winnerKills;
+  const yA = Math.round(yK * (1.5 + Math.random() * 0.7));
+  const eA = Math.round(eK * (1.5 + Math.random() * 0.7));
+
+  const yourPlayers  = genTeamStats(yourChamps, yK, eK, yA, win, dur);
+  const enemyPlayers = genTeamStats(enemyChamps, eK, yK, eA, !win, dur);
+
+  const yObj = genObjectives(win, dominance, dur);
+  const eObj = genObjectives(!win, dominance, dur);
+  if (yObj.drakes + eObj.drakes > 5) {
+    if (win) eObj.drakes = Math.max(0, 5 - yObj.drakes);
+    else yObj.drakes = Math.max(0, 5 - eObj.drakes);
+  }
+
+  const pog = [...yourPlayers].sort((a, b) => pogScore(b) - pogScore(a))[0].champ;
+
+  return {
+    i, opp: OPPONENTS[(i - 1) % OPPONENTS.length], win,
+    dur: `${dur}:${String(randInt(60)).padStart(2, '0')}`,
+    your:  { k: yK, a: yA, d: eK, gold: teamGold(yourPlayers, yObj, dur),  obj: yObj, players: yourPlayers },
+    enemy: { k: eK, a: eA, d: yK, gold: teamGold(enemyPlayers, eObj, dur), obj: eObj, players: enemyPlayers },
+    pog,
+  };
+}
+
 // ---- challenge-link encoding (no backend) ----------------------------------
-// A run is packed into the URL hash so a friend can open the exact roster +
-// record and try to beat it. base64(JSON), URL-safe via encodeURIComponent.
 function encodeChallenge(roster, result, name) {
   const payload = {
     n: (name || '').slice(0, 24),
     rec: [result.wins, result.losses],
-    avg: result.avg,
+    rat: result.rating,
     mvp: result.mvpName,
-    r: ROLES.map((role) => { const c = roster[role.id]; return [c.n, c.r, c.p, c.w ? 1 : 0]; }),
+    r: ROLES.map((role) => { const c = roster[role.id]; return [c.n, c.r, c.p]; }),
   };
   try { return btoa(unescape(encodeURIComponent(JSON.stringify(payload)))); }
   catch { return ''; }
@@ -260,6 +410,11 @@ function decodeChallenge(str) {
   try {
     const obj = JSON.parse(decodeURIComponent(escape(atob(str))));
     if (!obj || !Array.isArray(obj.rec) || !Array.isArray(obj.r)) return null;
+    // each roster entry must be [name, role, power] with a valid role
+    const okRoster = obj.r.length > 0 && obj.r.every(
+      (e) => Array.isArray(e) && typeof e[0] === 'string' && ROLE_MAP[e[1]]
+    );
+    if (!okRoster) return null;
     return obj;
   } catch { return null; }
 }
@@ -275,20 +430,20 @@ function shareBaseUrl() {
 
 // ---- champion avatar (pure CSS/SVG, no external assets) --------------------
 function Avatar({ champ, size = 'md' }) {
-  const role = ROLE_MAP[champ.r];
-  const dims = size === 'lg' ? 'h-20 w-20 text-2xl' : size === 'sm' ? 'h-11 w-11 text-sm' : 'h-16 w-16 text-xl';
+  const role = ROLE_MAP[champ.r] || ROLES[0];
+  const dims = size === 'lg' ? 'h-20 w-20 text-2xl'
+    : size === 'sm' ? 'h-11 w-11 text-sm'
+    : size === 'xs' ? 'h-8 w-8 text-[10px]'
+    : 'h-16 w-16 text-xl';
   const RoleIcon = role.Icon;
   return (
     <div className={`relative ${dims} shrink-0`}>
-      <div className={`h-full w-full rounded-2xl bg-gradient-to-br ${role.grad} grid place-items-center font-bold tracking-tight text-slate-950 shadow-lg ${role.glow} ring-1 ring-white/20`}>
+      <div className={`h-full w-full rounded-xl bg-gradient-to-br ${role.grad} grid place-items-center font-bold tracking-tight text-slate-950 shadow ${role.glow} ring-1 ring-white/20`}>
         {initials(champ.n)}
       </div>
-      <div className="absolute -bottom-1.5 -left-1.5 grid h-6 w-6 place-items-center rounded-lg bg-slate-950/90 ring-1 ring-white/10">
-        <RoleIcon className={`h-3.5 w-3.5 ${role.text}`} strokeWidth={2.5} />
-      </div>
-      {champ.w && (
-        <div className="absolute -top-2.5 left-1/2 -translate-x-1/2">
-          <Crown className="h-5 w-5 text-yellow-300 drop-shadow-[0_0_6px_rgba(253,224,71,0.9)] floaty" fill="currentColor" />
+      {size !== 'xs' && (
+        <div className="absolute -bottom-1.5 -left-1.5 grid h-6 w-6 place-items-center rounded-lg bg-slate-950/90 ring-1 ring-white/10">
+          <RoleIcon className={`h-3.5 w-3.5 ${role.text}`} strokeWidth={2.5} />
         </div>
       )}
     </div>
@@ -300,9 +455,7 @@ function RosterSlot({ role, champ }) {
   const RoleIcon = role.Icon;
   return (
     <div className={`relative flex flex-col items-center gap-2 rounded-2xl border p-3 transition-all duration-300
-      ${champ
-        ? `border-slate-700 bg-slate-900/70 ${champ.w ? 'ring-2 ring-yellow-300/60 shadow-lg shadow-yellow-400/10' : ''}`
-        : 'border-dashed border-slate-700/70 bg-slate-900/30'}`}>
+      ${champ ? 'border-slate-700 bg-slate-900/70' : 'border-dashed border-slate-700/70 bg-slate-900/30'}`}>
       <div className={`flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-widest ${role.text}`}>
         <RoleIcon className="h-3.5 w-3.5" /> {role.id}
       </div>
@@ -312,7 +465,7 @@ function RosterSlot({ role, champ }) {
           <div className="text-center">
             <div className="text-sm font-bold leading-tight">{champ.n}</div>
             <div className={`mt-1 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-bold ${ratingTone(champ.p)}`}>
-              {champ.w && <Crown className="h-3 w-3" />} {champWinRate(champ).toFixed(1)}%
+              {champWinRate(champ).toFixed(1)}%
             </div>
           </div>
         </>
@@ -328,31 +481,30 @@ function RosterSlot({ role, champ }) {
 // ---- a single ranked champion row in the roll list -------------------------
 function ChampRow({ champ, rank, onPick }) {
   const wr = champWinRate(champ);
-  const fill = Math.max(6, Math.min(100, ((wr - 44) / 14) * 100)); // scale ~44%..58%
+  const fill = Math.max(6, Math.min(100, ((wr - 44) / 14) * 100));
   const role = ROLE_MAP[champ.r];
+  const tags = champTags(champ);
   return (
     <button
       onClick={onPick}
-      className={`group flex items-center gap-3 rounded-2xl border bg-slate-900/70 p-3 text-left transition-all hover:translate-x-0.5 hover:bg-slate-900 hover:ring-2 ${role.ring}
-        ${champ.w ? 'border-yellow-300/50 shadow-lg shadow-yellow-400/10' : 'border-slate-700'}`}>
+      className={`group flex items-center gap-3 rounded-2xl border border-slate-700 bg-slate-900/70 p-3 text-left transition-all hover:translate-x-0.5 hover:bg-slate-900 hover:ring-2 ${role.ring}`}>
       <span className="w-4 shrink-0 text-center text-sm font-black text-slate-600">{rank}</span>
       <Avatar champ={champ} size="sm" />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <span className="truncate text-sm font-bold text-slate-100">{champ.n}</span>
-          {champ.w && (
-            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-yellow-400/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-yellow-300 ring-1 ring-yellow-300/40">
-              <Crown className="h-2.5 w-2.5" /> Wilt
-            </span>
-          )}
         </div>
-        <div className="truncate text-[11px] text-slate-500">{champ.era} · {champ.year}</div>
+        <div className="mt-0.5 flex flex-wrap items-center gap-1">
+          {tags.map((t, i) => (
+            <span key={i} className={`rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide ${t.tone}`}>{t.k}</span>
+          ))}
+        </div>
         <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-slate-800">
-          <div className={`h-full rounded-full ${champ.w ? 'bg-gradient-to-r from-yellow-400 to-amber-500' : 'bg-gradient-to-r from-sky-500 to-emerald-400'}`} style={{ width: fill + '%' }} />
+          <div className="h-full rounded-full bg-gradient-to-r from-sky-500 to-emerald-400" style={{ width: fill + '%' }} />
         </div>
       </div>
       <div className="shrink-0 text-right">
-        <div className={`text-base font-black leading-none ${champ.w ? 'text-yellow-300' : wr >= 51 ? 'text-emerald-300' : 'text-slate-200'}`}>{wr.toFixed(1)}%</div>
+        <div className={`text-base font-black leading-none ${wr >= 51 ? 'text-emerald-300' : 'text-slate-200'}`}>{wr.toFixed(1)}%</div>
         <div className="mt-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">win rate</div>
       </div>
       <Lock className="h-4 w-4 shrink-0 text-slate-600 transition group-hover:text-slate-300" />
@@ -360,10 +512,25 @@ function ChampRow({ champ, rank, onPick }) {
   );
 }
 
+// ---- composition readout (shown when the roster is complete) ---------------
+function CompBar({ label, value, tone }) {
+  const pct = Math.round(value * 100);
+  return (
+    <div>
+      <div className="mb-1 flex items-center justify-between text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+        <span>{label}</span><span className="text-slate-300">{pct}</span>
+      </div>
+      <div className="h-2 w-full overflow-hidden rounded-full bg-slate-800">
+        <div className={`h-full rounded-full ${tone}`} style={{ width: pct + '%' }} />
+      </div>
+    </div>
+  );
+}
+
 // ---- challenge banner (shown when opened via a friend's link) --------------
 function ChallengeBanner({ challenge, onDismiss }) {
   if (!challenge) return null;
-  const champs = (challenge.r || []).map(([n, r, p, w]) => ({ n, r, p, w: !!w }));
+  const champs = (challenge.r || []).map(([n, r, p]) => ({ n, r, p }));
   const [cw, cl] = challenge.rec;
   const name = challenge.n || 'A friend';
   return (
@@ -410,23 +577,17 @@ function DraftSimulator() {
   const emptyRoles = ROLES.filter((r) => !roster[r.id]).map((r) => r.id);
   const filled = 5 - emptyRoles.length;
   const complete = emptyRoles.length === 0;
-  const nextRole = emptyRoles[0]; // fixed order: Top, Jungle, Mid, ADC, Support
+  const nextRole = emptyRoles[0];
 
-  // Roll the next empty role's pool. You can only do this when nothing is on the
-  // table — i.e. after locking a pick (no roll-spamming).
   function rollPatch() {
     if (!nextRole) return;
     setRoll({ role: nextRole, options: rollRole(nextRole, 5) });
   }
-
-  // Reroll #1: same role, 5 fresh champions. Costs the one reroll for the run.
   function rerollChampions() {
     if (rerollUsed || !roll) return;
     setRoll({ role: roll.role, options: rollRole(roll.role, 5) });
     setRerollUsed(true);
   }
-
-  // Reroll #2: jump to a different empty role. Costs the one reroll for the run.
   function rerollRole() {
     if (rerollUsed || !roll) return;
     const others = emptyRoles.filter((r) => r !== roll.role);
@@ -435,44 +596,37 @@ function DraftSimulator() {
     setRoll({ role, options: rollRole(role, 5) });
     setRerollUsed(true);
   }
-
   function lockIn(champ) {
     setRoster((prev) => ({ ...prev, [champ.r]: champ }));
     setRoll(null);
   }
 
   function simulate() {
-    const champs = ROLES.map((r) => roster[r.id]);
-    const ratings = champs.map((c) => c.p);
-    const avg = ratings.reduce((a, b) => a + b, 0) / ratings.length;
-    const wilt = champs.find((c) => c.w) || null;
-    const hasWilt = !!wilt;
-    const base = Math.max(0.12, Math.min(0.92, (avg - 38) / 60));
+    const yourChamps = ROLES.map((r) => roster[r.id]);
+    const yourComp = evalComp(yourChamps);
+    const yourNamesByRole = Object.fromEntries(ROLES.map((r) => [r.id, roster[r.id].n]));
 
     const games = [];
     let wins = 0;
-    const mvpTally = {};
+    const pogTally = {};
     for (let i = 0; i < 18; i++) {
-      // The "broken math": a Wilt-tier champ overflows win rate past 100% — guaranteed sweep.
-      const p = hasWilt ? 1 : base + (Math.random() - 0.5) * 0.18;
-      const win = hasWilt ? true : Math.random() < Math.max(0.03, Math.min(0.99, p));
+      const enemyChamps = randomEnemyTeam(yourNamesByRole);
+      const enemyComp = evalComp(enemyChamps);
+      const diff = yourComp.rating - enemyComp.rating;
+      const p = clamp(1 / (1 + Math.exp(-diff / 12)), 0.08, 0.94);
+      const win = Math.random() < p;
       if (win) wins++;
-      const mvp = win
-        ? (hasWilt && Math.random() < 0.6 ? wilt : champs[randInt(5)])
-        : champs[randInt(5)];
-      if (win) mvpTally[mvp.n] = (mvpTally[mvp.n] || 0) + 1;
-      const k = win ? 14 + randInt(38) : 4 + randInt(16);
-      const d = win ? 2 + randInt(9) : 13 + randInt(20);
-      const a = win ? 10 + randInt(28) : 3 + randInt(14);
-      games.push({
-        i: i + 1, win, opp: OPPONENTS[i % OPPONENTS.length], mvp,
-        dur: `${22 + randInt(24)}:${String(randInt(60)).padStart(2, '0')}`,
-        kda: `${k}/${d}/${a}`,
-      });
+      // Expected results are lopsided; upsets are close games.
+      const favored = diff > 0;
+      const dominance = win === favored
+        ? clamp(Math.abs(diff) / 45 + (Math.random() * 0.2 - 0.1), 0.1, 0.92)
+        : clamp(0.12 + Math.random() * 0.2, 0.08, 0.42);
+      const game = buildGame(i + 1, yourChamps, enemyChamps, win, dominance);
+      games.push(game);
+      pogTally[game.pog.n] = (pogTally[game.pog.n] || 0) + 1;
     }
-    const mvpName = Object.entries(mvpTally).sort((x, y) => y[1] - x[1])[0]?.[0] || champs[0].n;
-    const avgWr = champs.reduce((s, c) => s + champWinRate(c), 0) / champs.length;
-    setResult({ wins, losses: 18 - wins, avg: Math.round(avg), avgWr, hasWilt, wilt, games, mvpName });
+    const mvpName = Object.entries(pogTally).sort((a, b) => b[1] - a[1])[0]?.[0] || yourChamps[0].n;
+    setResult({ wins, losses: 18 - wins, rating: Math.round(yourComp.rating), comp: yourComp, games, mvpName });
     setPhase('result');
     setOpenGame(null);
   }
@@ -486,6 +640,8 @@ function DraftSimulator() {
     setPhase('draft');
   }
 
+  const liveComp = complete ? evalComp(ROLES.map((r) => roster[r.id])) : null;
+
   return (
     <div className="min-h-screen w-full bg-[radial-gradient(60%_50%_at_50%_0%,rgba(56,189,248,0.10),transparent),radial-gradient(50%_40%_at_80%_10%,rgba(250,204,21,0.08),transparent)] bg-slate-950">
       <div className="mx-auto max-w-5xl px-4 py-8 sm:py-12">
@@ -495,13 +651,13 @@ function DraftSimulator() {
         {/* Header */}
         <header className="mb-8 text-center">
           <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-amber-400/30 bg-amber-400/5 px-4 py-1 text-xs font-semibold uppercase tracking-[0.25em] text-amber-300">
-            <Flame className="h-3.5 w-3.5" /> Broken Patch Edition
+            <Flame className="h-3.5 w-3.5" /> Draft & Match Sim
           </div>
           <h1 className="bg-gradient-to-r from-amber-200 via-yellow-400 to-sky-300 bg-clip-text text-4xl font-bold tracking-tight text-transparent sm:text-6xl drop-shadow-[0_2px_20px_rgba(250,204,21,0.25)]">
             DRAFT SIMULATOR
           </h1>
           <p className="mt-2 text-sm font-medium tracking-wide text-slate-400 sm:text-base">
-            Roll broken patches. Draft historic champions. Force the <span className="font-bold text-amber-300">18-0 split.</span>
+            Build a comp that <span className="font-bold text-sky-300">synergizes</span>. Out-draft the enemy team. Chase the <span className="font-bold text-amber-300">18-0 split.</span>
           </p>
         </header>
 
@@ -527,7 +683,7 @@ function DraftSimulator() {
           <section className="rounded-3xl border border-slate-800 bg-slate-900/40 p-5 backdrop-blur-sm sm:p-6">
             {!complete ? (
               !roll ? (
-                /* ---- Roll gate: nothing on the table, roll the next role ---- */
+                /* ---- Roll gate ---- */
                 <div className="flex flex-col items-center gap-4">
                   <button
                     onClick={rollPatch}
@@ -537,7 +693,7 @@ function DraftSimulator() {
                     <span className="absolute inset-0 -translate-x-full bg-white/20 transition-transform duration-500 group-hover:translate-x-full" />
                   </button>
                   <p className="max-w-md text-center text-sm text-slate-500">
-                    Deals <span className="font-semibold text-slate-300">5 random {ROLE_LABEL[nextRole].toLowerCase()}</span>, ranked by real-world win rate. Lock one to fill the role.
+                    Deals <span className="font-semibold text-slate-300">5 random {ROLE_LABEL[nextRole].toLowerCase()}</span>, ranked by win rate. But win rate doesn't win games — <span className="text-slate-300">check the comp tags</span> and build a balanced team.
                   </p>
                   <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-700 bg-slate-900/60 px-3 py-1 text-[11px] font-semibold uppercase tracking-widest text-slate-400">
                     {rerollUsed
@@ -546,7 +702,7 @@ function DraftSimulator() {
                   </span>
                 </div>
               ) : (
-                /* ---- Roll resolved: ranked list of 5, must pick before next roll ---- */
+                /* ---- Roll resolved ---- */
                 <div>
                   {(() => {
                     const role = ROLE_MAP[roll.role];
@@ -558,7 +714,7 @@ function DraftSimulator() {
                         </div>
                         <div>
                           <div className={`text-xs font-semibold uppercase tracking-widest ${role.text}`}>Rolling · {role.id}</div>
-                          <div className="text-lg font-bold text-slate-100">5 {ROLE_LABEL[roll.role].toLowerCase()} · ranked by win rate</div>
+                          <div className="text-lg font-bold text-slate-100">5 {ROLE_LABEL[roll.role].toLowerCase()} · pick for your comp</div>
                         </div>
                       </div>
                     );
@@ -596,21 +752,54 @@ function DraftSimulator() {
                 </div>
               )
             ) : (
-              <div className="flex flex-col items-center gap-4 py-2">
-                <div className="text-center">
-                  <div className="text-sm font-semibold uppercase tracking-widest text-emerald-300">Roster complete</div>
-                  <div className="text-sm text-slate-400">Average win rate: <span className="font-bold text-slate-200">{(ROLES.reduce((s, r) => s + champWinRate(roster[r.id]), 0) / 5).toFixed(1)}%</span></div>
+              /* ---- Roster complete: composition analysis + simulate ---- */
+              <div className="flex flex-col gap-5">
+                <div className="rounded-2xl border border-slate-800 bg-slate-950/40 p-4 sm:p-5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-sm font-bold uppercase tracking-widest text-slate-300">
+                      <Gauge className="h-4 w-4 text-sky-400" /> Team Composition
+                    </div>
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-3xl font-black text-slate-100">{Math.round(liveComp.rating)}</span>
+                      <span className="text-xs font-semibold uppercase text-slate-500">/ 100</span>
+                    </div>
+                  </div>
+                  <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <CompBar label="Damage"      value={liveComp.sub.damage}  tone="bg-gradient-to-r from-amber-400 to-orange-500" />
+                    <CompBar label="Frontline"   value={liveComp.sub.front}   tone="bg-gradient-to-r from-emerald-400 to-green-500" />
+                    <CompBar label="Engage / CC" value={liveComp.sub.engage}  tone="bg-gradient-to-r from-fuchsia-400 to-purple-500" />
+                    <CompBar label="AD/AP Mix"   value={liveComp.sub.balance} tone="bg-gradient-to-r from-sky-400 to-blue-500" />
+                  </div>
+                  {liveComp.flaws.length > 0 ? (
+                    <div className="mt-4 space-y-1.5">
+                      {liveComp.flaws.map((f, i) => (
+                        <div key={i} className="flex items-start gap-2 rounded-lg border border-rose-500/20 bg-rose-500/5 px-3 py-1.5 text-xs font-semibold text-rose-200">
+                          <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" /> {f}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="mt-4 flex items-center gap-2 rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-3 py-1.5 text-xs font-semibold text-emerald-200">
+                      <CheckCircle2 className="h-3.5 w-3.5 shrink-0" /> Well-rounded composition — no glaring weaknesses.
+                    </div>
+                  )}
+                  <p className="mt-3 text-center text-[11px] text-slate-500">
+                    Highest win rate ≠ best team. Damage, frontline, engage and AD/AP mix decide your games.
+                  </p>
                 </div>
-                <button
-                  onClick={simulate}
-                  className="group relative inline-flex items-center gap-3 overflow-hidden rounded-2xl bg-gradient-to-r from-amber-400 to-yellow-600 px-8 py-4 text-lg font-extrabold uppercase tracking-wide text-slate-950 shadow-xl shadow-amber-500/30 transition-all hover:scale-[1.03] hover:shadow-amber-400/50 active:scale-95">
-                  <Trophy className="h-6 w-6 transition-transform group-hover:-rotate-12" />
-                  Simulate 18-0 Split
-                  <span className="absolute inset-0 -translate-x-full bg-white/30 transition-transform duration-500 group-hover:translate-x-full" />
-                </button>
-                <button onClick={restart} className="text-xs font-semibold uppercase tracking-widest text-slate-500 transition hover:text-slate-300">
-                  Reset roster
-                </button>
+
+                <div className="flex flex-col items-center gap-3">
+                  <button
+                    onClick={simulate}
+                    className="group relative inline-flex items-center gap-3 overflow-hidden rounded-2xl bg-gradient-to-r from-amber-400 to-yellow-600 px-8 py-4 text-lg font-extrabold uppercase tracking-wide text-slate-950 shadow-xl shadow-amber-500/30 transition-all hover:scale-[1.03] hover:shadow-amber-400/50 active:scale-95">
+                    <Trophy className="h-6 w-6 transition-transform group-hover:-rotate-12" />
+                    Simulate 18-Game Split
+                    <span className="absolute inset-0 -translate-x-full bg-white/30 transition-transform duration-500 group-hover:translate-x-full" />
+                  </button>
+                  <button onClick={restart} className="text-xs font-semibold uppercase tracking-widest text-slate-500 transition hover:text-slate-300">
+                    Reset roster
+                  </button>
+                </div>
               </div>
             )}
           </section>
@@ -629,19 +818,96 @@ function DraftSimulator() {
   );
 }
 
+// ---- objective comparison + scoreboard -------------------------------------
+const OBJ_METRICS = [
+  { key: 'k',      label: 'Kills',   Icon: Swords },
+  { key: 'towers', label: 'Towers',  Icon: Castle,  obj: true },
+  { key: 'drakes', label: 'Dragons', Icon: Flame,   obj: true },
+  { key: 'barons', label: 'Barons',  Icon: Skull,   obj: true },
+  { key: 'gold',   label: 'Gold',    Icon: Coins,   gold: true },
+];
+const readMetric = (side, m) => (m.key === 'k' ? side.k : m.gold ? side.gold : side.obj[m.key]);
+const fmtMetric = (v, m) => (m.gold ? (v / 1000).toFixed(1) + 'k' : v);
+
+function PlayerRow({ p, isPog, side }) {
+  return (
+    <div className={`flex items-center gap-2 rounded-lg px-1.5 py-1 ${isPog ? 'bg-amber-400/10' : ''}`}>
+      <Avatar champ={p.champ} size="xs" />
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-1 truncate text-xs font-semibold text-slate-200">
+          {p.champ.n}
+          {isPog && <Star className="h-3 w-3 shrink-0 text-amber-300" fill="currentColor" />}
+        </div>
+        <div className="text-[9px] uppercase tracking-wide text-slate-500">{p.champ.r}</div>
+      </div>
+      <div className="text-right font-mono text-xs font-semibold text-slate-200">
+        {p.k}<span className="text-slate-500">/</span>{p.d}<span className="text-slate-500">/</span>{p.a}
+      </div>
+      <div className="w-12 text-right text-[11px] text-slate-400">{p.cs} cs</div>
+    </div>
+  );
+}
+
+function Scoreboard({ g }) {
+  return (
+    <div className="border-t border-slate-800/80 px-3 py-3">
+      {/* Objective comparison */}
+      <div className="mb-3 grid grid-cols-1 gap-1 rounded-xl border border-slate-800 bg-slate-950/40 p-2.5">
+        <div className="mb-1 flex items-center justify-between text-[10px] font-bold uppercase tracking-widest">
+          <span className="text-emerald-300">Your Team</span>
+          <span className="text-slate-500">{g.dur}</span>
+          <span className="text-rose-300">{g.opp}</span>
+        </div>
+        {OBJ_METRICS.map((m) => {
+          const yv = readMetric(g.your, m), ev = readMetric(g.enemy, m);
+          return (
+            <div key={m.key} className="flex items-center justify-between gap-2 text-xs">
+              <span className={`w-14 text-right font-bold tabular-nums ${yv >= ev ? 'text-emerald-300' : 'text-slate-400'}`}>{fmtMetric(yv, m)}</span>
+              <span className="flex flex-1 items-center justify-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                <m.Icon className="h-3.5 w-3.5" /> {m.label}
+              </span>
+              <span className={`w-14 text-left font-bold tabular-nums ${ev > yv ? 'text-rose-300' : 'text-slate-400'}`}>{fmtMetric(ev, m)}</span>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Two team scoreboards */}
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <div className={`rounded-xl border p-2 ${g.win ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-rose-500/25 bg-rose-500/5'}`}>
+          <div className="mb-1 flex items-center justify-between px-1.5 text-[10px] font-bold uppercase tracking-widest">
+            <span className={g.win ? 'text-emerald-300' : 'text-rose-300'}>{g.win ? 'Victory' : 'Defeat'} · Your Team</span>
+            <span className="font-mono text-slate-400">{g.your.k}/{g.your.d}/{g.your.a}</span>
+          </div>
+          {g.your.players.map((p, i) => (
+            <PlayerRow key={i} p={p} isPog={p.champ === g.pog} side="your" />
+          ))}
+        </div>
+        <div className={`rounded-xl border p-2 ${!g.win ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-slate-700/60 bg-slate-900/40'}`}>
+          <div className="mb-1 flex items-center justify-between px-1.5 text-[10px] font-bold uppercase tracking-widest">
+            <span className="text-slate-300">{!g.win ? 'Victory · ' : ''}{g.opp}</span>
+            <span className="font-mono text-slate-400">{g.enemy.k}/{g.enemy.d}/{g.enemy.a}</span>
+          </div>
+          {g.enemy.players.map((p, i) => (
+            <PlayerRow key={i} p={p} isPog={false} side="enemy" />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ---- result panel ----------------------------------------------------------
 function ResultPanel({ result, roster, challenge, openGame, setOpenGame, restart }) {
-  const { wins, losses, avg, avgWr, hasWilt, wilt, games, mvpName } = result;
+  const { wins, losses, rating, comp, games, mvpName } = result;
   const swept = losses === 0;
   const winPct = Math.round((wins / 18) * 100);
 
-  // Challenge comparison (if the player arrived via a friend's link)
   const cName = challenge ? (challenge.n || 'Your friend') : null;
   const cw = challenge ? challenge.rec[0] : null;
   const cl = challenge ? challenge.rec[1] : null;
   const verdict = challenge ? (wins > cw ? 'win' : wins === cw ? 'tie' : 'loss') : null;
 
-  // Share-a-challenge state
   const [shareName, setShareName] = useState('');
   const [copied, setCopied] = useState(false);
   const shareUrl = `${shareBaseUrl()}#c=${encodeURIComponent(encodeChallenge(roster, result, shareName))}`;
@@ -671,7 +937,7 @@ function ResultPanel({ result, roster, challenge, openGame, setOpenGame, restart
             {wins}-{losses}
           </div>
           <div className="mt-2 text-sm font-medium text-slate-400">
-            {winPct}% series win rate · avg champ WR <span className="font-bold text-slate-200">{avgWr != null ? avgWr.toFixed(1) : avg}%</span>
+            {winPct}% series win rate · Team Rating <span className="font-bold text-slate-200">{rating}</span>
           </div>
 
           {challenge && (
@@ -688,16 +954,14 @@ function ResultPanel({ result, roster, challenge, openGame, setOpenGame, restart
             </div>
           )}
 
-          {hasWilt && (
-            <div className="mx-auto mt-5 max-w-xl rounded-2xl border border-yellow-300/40 bg-yellow-400/10 p-4 text-left">
-              <div className="flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-yellow-300">
-                <TriangleAlert className="h-4 w-4" /> Simulation Overflow Detected
+          {comp && comp.flaws.length > 0 && (
+            <div className="mx-auto mt-5 max-w-xl rounded-2xl border border-rose-400/30 bg-rose-500/5 p-4 text-left">
+              <div className="flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-rose-300">
+                <TriangleAlert className="h-4 w-4" /> Comp Weaknesses Cost You Games
               </div>
-              <p className="mt-1 text-sm text-yellow-100/90">
-                <span className="font-bold">{wilt.n}</span> is <span className="font-bold">Wilt Chamberlain Tier (99)</span>.
-                The hidden +15% win multiplier exceeded 100% and broke the math —
-                the rest of the roster became statistically irrelevant. <span className="font-bold">Free 18-0.</span>
-              </p>
+              <ul className="mt-1 list-disc space-y-0.5 pl-5 text-sm text-rose-100/90">
+                {comp.flaws.map((f, i) => <li key={i}>{f}</li>)}
+              </ul>
             </div>
           )}
 
@@ -707,7 +971,7 @@ function ResultPanel({ result, roster, challenge, openGame, setOpenGame, restart
             </span>
             <span className="inline-flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-900/60 px-3 py-1.5 font-semibold text-slate-200">
               {swept ? <Trophy className="h-4 w-4 text-yellow-300" /> : <Skull className="h-4 w-4 text-rose-400" />}
-              {swept ? 'Perfect Season' : `${losses} bad game${losses === 1 ? '' : 's'}`}
+              {swept ? 'Perfect Season' : `${losses} loss${losses === 1 ? '' : 'es'}`}
             </span>
           </div>
 
@@ -759,11 +1023,11 @@ function ResultPanel({ result, roster, challenge, openGame, setOpenGame, restart
         ))}
       </div>
 
-      {/* Interactive game log */}
+      {/* Interactive game log with full scoreboards */}
       <div className="rounded-3xl border border-slate-800 bg-slate-900/40 p-4 sm:p-5">
         <h3 className="mb-3 flex items-center gap-2 text-sm font-bold uppercase tracking-widest text-slate-300">
           <Activity className="h-4 w-4 text-sky-400" /> Game Log
-          <span className="ml-auto text-[11px] font-medium normal-case tracking-normal text-slate-500">tap a game for details</span>
+          <span className="ml-auto text-[11px] font-medium normal-case tracking-normal text-slate-500">tap a game for the scoreboard</span>
         </h3>
         <div className="grid gap-1.5">
           {games.map((g) => {
@@ -778,21 +1042,14 @@ function ResultPanel({ result, roster, challenge, openGame, setOpenGame, restart
                     {g.win ? 'W' : 'L'}
                   </span>
                   <span className="text-sm font-semibold text-slate-300">vs <span className="text-slate-100">{g.opp}</span></span>
+                  <span className="ml-2 hidden font-mono text-xs text-slate-500 sm:inline">{g.your.k}/{g.your.d}/{g.your.a}</span>
                   <span className="ml-auto flex items-center gap-2">
-                    <Avatar champ={g.mvp} size="sm" />
+                    <span className="hidden text-[11px] font-semibold text-slate-400 sm:inline">{g.pog.n}</span>
+                    <Avatar champ={g.pog} size="xs" />
                     <ChevronDown className={`h-4 w-4 text-slate-500 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
                   </span>
                 </button>
-                {isOpen && (
-                  <div className="border-t border-slate-800/80 px-3 py-3 text-sm">
-                    <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-slate-400">
-                      <span><span className="text-slate-500">Result:</span> <span className={g.win ? 'font-bold text-emerald-300' : 'font-bold text-rose-300'}>{g.win ? 'Victory' : 'Defeat'}</span></span>
-                      <span><span className="text-slate-500">Duration:</span> <span className="font-semibold text-slate-200">{g.dur}</span></span>
-                      <span><span className="text-slate-500">MVP:</span> <span className="font-semibold text-slate-200">{g.mvp.n}</span> ({g.mvp.r})</span>
-                      <span><span className="text-slate-500">KDA:</span> <span className="font-mono font-semibold text-slate-200">{g.kda}</span></span>
-                    </div>
-                  </div>
-                )}
+                {isOpen && <Scoreboard g={g} />}
               </div>
             );
           })}
