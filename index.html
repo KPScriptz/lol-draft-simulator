@@ -1,0 +1,720 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>LoL Draft Simulator — 18-0 Split</title>
+  <meta name="description" content="Roll broken historic LoL patches, draft Wilt-tier champions, and force the 18-0 split. Then challenge your friends to beat your record." />
+  <meta name="theme-color" content="#0f172a" />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="LoL Draft Simulator — 18-0 Split" />
+  <meta property="og:description" content="Roll broken patches, draft Wilt-tier champions, and force the 18-0 split. Can you beat my record?" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = { darkMode: 'class' }</script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&display=swap');
+    body { font-family: 'Rajdhani', system-ui, sans-serif; }
+    @keyframes floaty { 0%,100%{ transform: translateY(0) } 50%{ transform: translateY(-4px) } }
+    .floaty { animation: floaty 3s ease-in-out infinite; }
+    @keyframes pulseGlow { 0%,100%{ opacity:.6 } 50%{ opacity:1 } }
+    .pulse-glow { animation: pulseGlow 1.8s ease-in-out infinite; }
+  </style>
+  <script type="importmap">
+  {
+    "imports": {
+      "react": "https://esm.sh/react@18.3.1",
+      "react-dom/client": "https://esm.sh/react-dom@18.3.1/client",
+      "lucide-react": "https://esm.sh/lucide-react@0.460.0?deps=react@18.3.1"
+    }
+  }
+  </script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body class="bg-slate-950 text-slate-100">
+  <div id="root"></div>
+
+  <script type="text/babel" data-type="module" data-presets="react">
+import React, { useState, useMemo } from 'react';
+import { createRoot } from 'react-dom/client';
+import {
+  Dices, Swords, TreePine, Sparkles, Crosshair, HeartHandshake,
+  Trophy, Crown, RotateCcw, Zap, Skull, Flame, ChevronDown,
+  Shield, Activity, Star, Lock, TriangleAlert,
+  Target, Users, Copy, Check
+} from 'lucide-react';
+
+/* ----------------------------------------------------------------------------
+   LoL Draft Simulator — "18-0 Split"
+   A single self-contained component. Everything below the component is just a
+   one-line mount harness so it runs in the browser with zero build step.
+---------------------------------------------------------------------------- */
+
+const ROLES = [
+  { id: 'Top',     Icon: Swords,         grad: 'from-rose-500 to-orange-600',     text: 'text-rose-300',    ring: 'ring-rose-400/50',    chip: 'bg-rose-500/15 text-rose-200 border-rose-400/30',    glow: 'shadow-rose-500/30' },
+  { id: 'Jungle',  Icon: TreePine,       grad: 'from-emerald-500 to-green-700',   text: 'text-emerald-300', ring: 'ring-emerald-400/50', chip: 'bg-emerald-500/15 text-emerald-200 border-emerald-400/30', glow: 'shadow-emerald-500/30' },
+  { id: 'Mid',     Icon: Sparkles,       grad: 'from-sky-500 to-blue-700',        text: 'text-sky-300',     ring: 'ring-sky-400/50',     chip: 'bg-sky-500/15 text-sky-200 border-sky-400/30',       glow: 'shadow-sky-500/30' },
+  { id: 'ADC',     Icon: Crosshair,      grad: 'from-amber-400 to-yellow-600',    text: 'text-amber-300',   ring: 'ring-amber-400/50',   chip: 'bg-amber-500/15 text-amber-200 border-amber-400/30',  glow: 'shadow-amber-500/30' },
+  { id: 'Support', Icon: HeartHandshake, grad: 'from-fuchsia-500 to-purple-700',  text: 'text-fuchsia-300', ring: 'ring-fuchsia-400/50', chip: 'bg-fuchsia-500/15 text-fuchsia-200 border-fuchsia-400/30', glow: 'shadow-fuchsia-500/30' },
+];
+const ROLE_MAP = Object.fromEntries(ROLES.map(r => [r.id, r]));
+
+// Each era covers all 5 roles. `w: true` flags a "Wilt Chamberlain Tier" champ
+// whose 99 rating breaks the simulation math and forces an 18-0 sweep.
+const ERAS = [
+  {
+    id: 's1', name: 'Season 1 Release', year: '2009',
+    blurb: 'Before balance was invented. Numbers were a suggestion.',
+    champs: [
+      { n: 'Garen',        r: 'Top',     p: 88, t: 'Spin to win — items optional.' },
+      { n: 'Singed',       r: 'Top',     p: 84, t: 'Proxy poison the entire map.' },
+      { n: 'Teemo',        r: 'Top',     p: 80, t: 'Shrooms predate vision rules.' },
+      { n: 'Xin Zhao',     r: 'Jungle',  p: 99, w: true, t: 'Release Xin: 3-item all-in by minute six.' },
+      { n: 'Warwick',      r: 'Jungle',  p: 82, t: 'Infinite sustain, free ganks.' },
+      { n: 'Nunu',         r: 'Jungle',  p: 78, t: 'Smite, clear, repeat.' },
+      { n: 'Annie',        r: 'Mid',     p: 85, t: 'Tibbers one-shots the lobby.' },
+      { n: 'Twisted Fate', r: 'Mid',     p: 83, t: 'Global gold gun.' },
+      { n: 'Ryze',         r: 'Mid',     p: 80, t: 'Infinite mana, infinite spells.' },
+      { n: 'Tristana',     r: 'ADC',     p: 84, t: 'Rocket-jump escape artist.' },
+      { n: 'Sivir',        r: 'ADC',     p: 80, t: 'Spell-shield diff.' },
+      { n: 'Ashe',         r: 'ADC',     p: 79, t: 'Cross-map arrow snipes.' },
+      { n: 'Soraka',       r: 'Support', p: 78, t: 'Global heal, never die.' },
+      { n: 'Alistar',      r: 'Support', p: 82, t: 'Headbutt → pulverize highlight reel.' },
+      { n: 'Janna',        r: 'Support', p: 79, t: 'Disengage everything, always.' },
+    ],
+  },
+  {
+    id: 's3', name: 'Season 3', year: '2013',
+    blurb: 'So broken Riot perma-banned him at Worlds.',
+    champs: [
+      { n: 'Kassadin',     r: 'Mid',     p: 99, w: true, t: 'S3 Kass: Riftwalk one-shot, perma-banned.' },
+      { n: 'Zed',          r: 'Mid',     p: 90, t: 'Press R, win the game.' },
+      { n: 'Ahri',         r: 'Mid',     p: 84, t: 'Charm equals kill.' },
+      { n: 'Shen',         r: 'Top',     p: 84, t: 'Global ult babysitter.' },
+      { n: 'Jax',          r: 'Top',     p: 85, t: 'Stacks, then deletes you.' },
+      { n: 'Rumble',       r: 'Top',     p: 83, t: 'Equalizer zone control.' },
+      { n: 'Elise',        r: 'Jungle',  p: 88, t: 'Spider-form gank meta.' },
+      { n: 'Zac',          r: 'Jungle',  p: 86, t: 'Goo-blob flank engage.' },
+      { n: 'Vi',           r: 'Jungle',  p: 85, t: 'Point-and-click ultimate.' },
+      { n: 'Caitlyn',      r: 'ADC',     p: 87, t: 'Trap-zone lane bully.' },
+      { n: 'Vayne',        r: 'ADC',     p: 86, t: 'Late game 1v9 condi.' },
+      { n: 'Ezreal',       r: 'ADC',     p: 83, t: 'Blue-build infinite poke.' },
+      { n: 'Zyra',         r: 'Support', p: 82, t: 'Plant-wall zone control.' },
+      { n: 'Sona',         r: 'Support', p: 80, t: 'Aura buff-bot, ult engage.' },
+      { n: 'Thresh',       r: 'Support', p: 86, t: 'Hook = montage clip.' },
+    ],
+  },
+  {
+    id: 'p420', name: 'Patch 4.20 Weedwick', year: '2014',
+    blurb: '420 blaze it — Warwick reborn as a lifesteal lord.',
+    champs: [
+      { n: 'Warwick',      r: 'Jungle',  p: 90, t: 'Weedwick: heals through your team.' },
+      { n: 'Lee Sin',      r: 'Jungle',  p: 88, t: 'Insec or int — no in-between.' },
+      { n: 'Elise',        r: 'Jungle',  p: 86, t: 'Early gank tempo queen.' },
+      { n: 'Maokai',       r: 'Top',     p: 82, t: 'Sapling poke teamfight.' },
+      { n: 'Dr. Mundo',    r: 'Top',     p: 81, t: 'Goes where he pleases.' },
+      { n: 'Renekton',     r: 'Top',     p: 85, t: 'Point-and-click lane dominance.' },
+      { n: 'Syndra',       r: 'Mid',     p: 86, t: 'Orbs delete carries.' },
+      { n: 'Ahri',         r: 'Mid',     p: 84, t: 'Charm into the void.' },
+      { n: 'Zed',          r: 'Mid',     p: 88, t: 'Shadow shuriken assassin.' },
+      { n: 'Lucian',       r: 'ADC',     p: 88, t: 'Double-tap dash spam.' },
+      { n: "Kog'Maw",      r: 'ADC',     p: 82, t: 'Liquid hyper-carry.' },
+      { n: 'Jinx',         r: 'ADC',     p: 84, t: 'Reload, snowball, giggle.' },
+      { n: 'Thresh',       r: 'Support', p: 89, t: 'Lantern + hook playmaker.' },
+      { n: 'Janna',        r: 'Support', p: 83, t: 'Shield-bot disengage.' },
+      { n: 'Morgana',      r: 'Support', p: 82, t: 'Black-shield diff.' },
+    ],
+  },
+  {
+    id: 's7', name: 'Season 7 Ardent Censer', year: '2017',
+    blurb: 'Touch your ADC, win the game. The enchanter apocalypse.',
+    champs: [
+      { n: 'Janna',        r: 'Support', p: 95, t: 'Ardent shield-bot, untouchable.' },
+      { n: 'Lulu',         r: 'Support', p: 93, t: 'Pix + shield = invincible carry.' },
+      { n: 'Rakan',        r: 'Support', p: 88, t: 'Engage enchanter swashbuckler.' },
+      { n: 'Twitch',       r: 'ADC',     p: 96, t: 'Ardent rat: invisible 1v9.' },
+      { n: 'Tristana',     r: 'ADC',     p: 90, t: 'Attack-speed overload.' },
+      { n: "Kog'Maw",      r: 'ADC',     p: 94, t: 'Ardent Kog melts towers and souls.' },
+      { n: 'Camille',      r: 'Top',     p: 88, t: 'Hookshot dive, enchanter dream.' },
+      { n: 'Maokai',       r: 'Top',     p: 83, t: 'Tank that never dies.' },
+      { n: 'Gnar',         r: 'Top',     p: 84, t: 'Mega-rage flips fights.' },
+      { n: 'Graves',       r: 'Jungle',  p: 86, t: 'Smoke + crit jungle.' },
+      { n: 'Lee Sin',      r: 'Jungle',  p: 84, t: 'Tempo carry jungle.' },
+      { n: "Kha'Zix",      r: 'Jungle',  p: 85, t: 'Isolation one-shot.' },
+      { n: 'Cassiopeia',   r: 'Mid',     p: 85, t: 'Twin-Fang DPS machine.' },
+      { n: 'Orianna',      r: 'Mid',     p: 86, t: 'Ball delivery teamfight.' },
+      { n: 'Syndra',       r: 'Mid',     p: 85, t: 'Stun-orb burst.' },
+    ],
+  },
+  {
+    id: 'aphelios', name: '2020 "200 Years" Aphelios', year: '2020',
+    blurb: 'It allegedly took Riot 200 years to balance him. It did not work.',
+    champs: [
+      { n: 'Aphelios',     r: 'ADC',     p: 99, w: true, t: '200 Years: five guns, zero counterplay.' },
+      { n: 'Senna',        r: 'ADC',     p: 90, t: 'Souls scale to infinity.' },
+      { n: 'Ezreal',       r: 'ADC',     p: 86, t: 'Mythic-spam safe poke.' },
+      { n: 'Yuumi',        r: 'Support', p: 92, t: 'Press R — you cannot lose lane.' },
+      { n: 'Senna',        r: 'Support', p: 88, t: 'Carry-from-support scaling.' },
+      { n: 'Bard',         r: 'Support', p: 84, t: 'Chime roam, meep stacks.' },
+      { n: 'Sett',         r: 'Top',     p: 89, t: 'Boss-man right-click.' },
+      { n: 'Ornn',         r: 'Top',     p: 84, t: 'Upgrades the whole team.' },
+      { n: 'Camille',      r: 'Top',     p: 86, t: 'Splitpush dive threat.' },
+      { n: 'Lillia',       r: 'Jungle',  p: 86, t: 'Sleepy-dream chunk machine.' },
+      { n: 'Graves',       r: 'Jungle',  p: 87, t: 'True-damage jungle carry.' },
+      { n: 'Hecarim',      r: 'Jungle',  p: 86, t: 'Ram-speed flank engage.' },
+      { n: 'Sett',         r: 'Mid',     p: 86, t: 'Wait... Sett mid?' },
+      { n: 'Diana',        r: 'Mid',     p: 86, t: 'Reset-dive moon queen.' },
+      { n: 'Ekko',         r: 'Mid',     p: 87, t: 'Rewind the teamfight.' },
+    ],
+  },
+  {
+    id: 's6', name: 'Season 6 Assassin Update', year: '2016',
+    blurb: 'Lethality + Duskblade turned mid lane into a coin flip.',
+    champs: [
+      { n: 'LeBlanc',      r: 'Mid',     p: 92, t: 'Distortion in, delete, vanish.' },
+      { n: 'Zed',          r: 'Mid',     p: 90, t: 'Shadow assassin prime.' },
+      { n: 'Fizz',         r: 'Mid',     p: 88, t: 'Troll-pole untargetable.' },
+      { n: 'Darius',       r: 'Top',     p: 90, t: 'Juggernaut dunk machine.' },
+      { n: 'Illaoi',       r: 'Top',     p: 85, t: 'Tentacle test of spirit.' },
+      { n: 'Riven',        r: 'Top',     p: 87, t: 'Animation-cancel diff.' },
+      { n: "Rek'Sai",      r: 'Jungle',  p: 86, t: 'Tunnel-gank knockup.' },
+      { n: 'Graves',       r: 'Jungle',  p: 88, t: 'Reworked crit jungle.' },
+      { n: 'Nidalee',      r: 'Jungle',  p: 85, t: 'Cross-map spear poke.' },
+      { n: 'Lucian',       r: 'ADC',     p: 87, t: 'Lethality double-tap.' },
+      { n: 'Jhin',         r: 'ADC',     p: 86, t: '4th shot one-shot.' },
+      { n: 'Caitlyn',      r: 'ADC',     p: 85, t: 'Headshot lane tyrant.' },
+      { n: 'Tahm Kench',   r: 'Support', p: 85, t: 'Devour save/engage.' },
+      { n: 'Bard',         r: 'Support', p: 83, t: 'Tunnel-roam chaos.' },
+      { n: 'Zyra',         r: 'Support', p: 84, t: 'Plant-zone lockdown.' },
+    ],
+  },
+];
+
+const OPPONENTS = ['T1','G2','GenG','JDG','FNC','DRX','C9','FPX','EDG','RNG','TES','DK','BLG','HLE','KT','100T'];
+
+// ---- helpers ---------------------------------------------------------------
+const randInt = (n) => Math.floor(Math.random() * n);
+function sample(arr, k) {
+  const a = [...arr];
+  const out = [];
+  while (a.length && out.length < k) out.push(a.splice(randInt(a.length), 1)[0]);
+  return out;
+}
+function initials(name) {
+  const parts = name.replace(/[^A-Za-z ']/g, '').split(' ').filter(Boolean);
+  if (parts.length > 1) return (parts[0][0] + parts[1][0]).toUpperCase();
+  return name.slice(0, 2).toUpperCase();
+}
+function ratingTone(p) {
+  if (p >= 99) return 'text-yellow-300 border-yellow-300/60 bg-yellow-400/10';
+  if (p >= 90) return 'text-amber-300 border-amber-300/50 bg-amber-400/10';
+  if (p >= 82) return 'text-sky-300 border-sky-300/50 bg-sky-400/10';
+  return 'text-slate-300 border-slate-400/40 bg-slate-400/10';
+}
+
+// ---- challenge-link encoding (no backend) ----------------------------------
+// A run is packed into the URL hash so a friend can open the exact roster +
+// record and try to beat it. base64(JSON), URL-safe via encodeURIComponent.
+function encodeChallenge(roster, result, name) {
+  const payload = {
+    n: (name || '').slice(0, 24),
+    rec: [result.wins, result.losses],
+    avg: result.avg,
+    mvp: result.mvpName,
+    r: ROLES.map((role) => { const c = roster[role.id]; return [c.n, c.r, c.p, c.w ? 1 : 0]; }),
+  };
+  try { return btoa(unescape(encodeURIComponent(JSON.stringify(payload)))); }
+  catch { return ''; }
+}
+function decodeChallenge(str) {
+  try {
+    const obj = JSON.parse(decodeURIComponent(escape(atob(str))));
+    if (!obj || !Array.isArray(obj.rec) || !Array.isArray(obj.r)) return null;
+    return obj;
+  } catch { return null; }
+}
+function readChallengeFromUrl() {
+  if (typeof window === 'undefined') return null;
+  const m = (window.location.hash || '').match(/[#&]c=([^&]+)/);
+  return m ? decodeChallenge(decodeURIComponent(m[1])) : null;
+}
+function shareBaseUrl() {
+  if (typeof window === 'undefined') return '';
+  return window.location.origin + window.location.pathname;
+}
+
+// ---- champion avatar (pure CSS/SVG, no external assets) --------------------
+function Avatar({ champ, size = 'md' }) {
+  const role = ROLE_MAP[champ.r];
+  const dims = size === 'lg' ? 'h-20 w-20 text-2xl' : size === 'sm' ? 'h-11 w-11 text-sm' : 'h-16 w-16 text-xl';
+  const RoleIcon = role.Icon;
+  return (
+    <div className={`relative ${dims} shrink-0`}>
+      <div className={`h-full w-full rounded-2xl bg-gradient-to-br ${role.grad} grid place-items-center font-bold tracking-tight text-slate-950 shadow-lg ${role.glow} ring-1 ring-white/20`}>
+        {initials(champ.n)}
+      </div>
+      <div className="absolute -bottom-1.5 -left-1.5 grid h-6 w-6 place-items-center rounded-lg bg-slate-950/90 ring-1 ring-white/10">
+        <RoleIcon className={`h-3.5 w-3.5 ${role.text}`} strokeWidth={2.5} />
+      </div>
+      {champ.w && (
+        <div className="absolute -top-2.5 left-1/2 -translate-x-1/2">
+          <Crown className="h-5 w-5 text-yellow-300 drop-shadow-[0_0_6px_rgba(253,224,71,0.9)] floaty" fill="currentColor" />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---- roster slot -----------------------------------------------------------
+function RosterSlot({ role, champ }) {
+  const RoleIcon = role.Icon;
+  return (
+    <div className={`relative flex flex-col items-center gap-2 rounded-2xl border p-3 transition-all duration-300
+      ${champ
+        ? `border-slate-700 bg-slate-900/70 ${champ.w ? 'ring-2 ring-yellow-300/60 shadow-lg shadow-yellow-400/10' : ''}`
+        : 'border-dashed border-slate-700/70 bg-slate-900/30'}`}>
+      <div className={`flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-widest ${role.text}`}>
+        <RoleIcon className="h-3.5 w-3.5" /> {role.id}
+      </div>
+      {champ ? (
+        <>
+          <Avatar champ={champ} />
+          <div className="text-center">
+            <div className="text-sm font-bold leading-tight">{champ.n}</div>
+            <div className={`mt-1 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-bold ${ratingTone(champ.p)}`}>
+              {champ.w && <Crown className="h-3 w-3" />} {champ.p}
+            </div>
+          </div>
+        </>
+      ) : (
+        <div className="grid h-16 w-16 place-items-center rounded-2xl border border-dashed border-slate-700 text-slate-600">
+          <Lock className="h-5 w-5" />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---- challenge banner (shown when opened via a friend's link) --------------
+function ChallengeBanner({ challenge, onDismiss }) {
+  if (!challenge) return null;
+  const champs = (challenge.r || []).map(([n, r, p, w]) => ({ n, r, p, w: !!w }));
+  const [cw, cl] = challenge.rec;
+  const name = challenge.n || 'A friend';
+  return (
+    <div className="mb-6 rounded-2xl border border-fuchsia-400/30 bg-gradient-to-r from-fuchsia-500/10 via-purple-500/5 to-transparent p-4 sm:p-5">
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-fuchsia-500/20 text-fuchsia-300">
+          <Target className="h-5 w-5" />
+        </div>
+        <div className="min-w-0">
+          <div className="text-xs font-semibold uppercase tracking-widest text-fuchsia-300">Challenge received</div>
+          <div className="text-base font-bold text-slate-100 sm:text-lg">
+            {name} dares you to beat <span className="text-fuchsia-200">{cw}-{cl}</span>
+          </div>
+        </div>
+        <button onClick={onDismiss} className="ml-auto rounded-lg border border-slate-700 px-3 py-1.5 text-xs font-semibold text-slate-400 transition hover:text-slate-200">
+          Play free mode
+        </button>
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {champs.map((c, i) => (
+          <div key={i} className="flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-900/60 px-2 py-1">
+            <Avatar champ={c} size="sm" />
+            <div className="pr-1">
+              <div className="text-xs font-bold leading-tight">{c.n}</div>
+              <div className="text-[10px] uppercase tracking-wide text-slate-400">{c.r} · {c.p}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ---- the one and only app component ----------------------------------------
+function DraftSimulator() {
+  const [roster, setRoster] = useState({ Top: null, Jungle: null, Mid: null, ADC: null, Support: null });
+  const [roll, setRoll] = useState(null);            // { era, options:[champ] }
+  const [phase, setPhase] = useState('draft');        // 'draft' | 'result'
+  const [result, setResult] = useState(null);
+  const [openGame, setOpenGame] = useState(null);
+  const [challenge, setChallenge] = useState(readChallengeFromUrl);
+
+  const filled = ROLES.filter((r) => roster[r.id]).length;
+  const complete = filled === 5;
+
+  function rollPatch() {
+    const empty = ROLES.filter((r) => !roster[r.id]).map((r) => r.id);
+    let era = null, options = [];
+    for (let t = 0; t < 30 && options.length === 0; t++) {
+      const candidate = ERAS[randInt(ERAS.length)];
+      const pool = candidate.champs.filter((c) => empty.includes(c.r));
+      const picked = sample(pool, 3);
+      if (picked.length) { era = candidate; options = picked; }
+    }
+    setRoll({ era, options });
+  }
+
+  function lockIn(champ) {
+    setRoster((prev) => ({ ...prev, [champ.r]: champ }));
+    setRoll(null);
+  }
+
+  function simulate() {
+    const champs = ROLES.map((r) => roster[r.id]);
+    const ratings = champs.map((c) => c.p);
+    const avg = ratings.reduce((a, b) => a + b, 0) / ratings.length;
+    const wilt = champs.find((c) => c.w) || null;
+    const hasWilt = !!wilt;
+    const base = Math.max(0.12, Math.min(0.92, (avg - 38) / 60));
+
+    const games = [];
+    let wins = 0;
+    const mvpTally = {};
+    for (let i = 0; i < 18; i++) {
+      // The "broken math": a Wilt-tier champ overflows win rate past 100%.
+      const p = hasWilt ? 0.985 : base + (Math.random() - 0.5) * 0.18;
+      const win = Math.random() < Math.max(0.03, Math.min(0.99, p));
+      if (win) wins++;
+      const mvp = win
+        ? (hasWilt && Math.random() < 0.6 ? wilt : champs[randInt(5)])
+        : champs[randInt(5)];
+      if (win) mvpTally[mvp.n] = (mvpTally[mvp.n] || 0) + 1;
+      const k = win ? 14 + randInt(38) : 4 + randInt(16);
+      const d = win ? 2 + randInt(9) : 13 + randInt(20);
+      const a = win ? 10 + randInt(28) : 3 + randInt(14);
+      games.push({
+        i: i + 1, win, opp: OPPONENTS[i % OPPONENTS.length], mvp,
+        dur: `${22 + randInt(24)}:${String(randInt(60)).padStart(2, '0')}`,
+        kda: `${k}/${d}/${a}`,
+      });
+    }
+    const mvpName = Object.entries(mvpTally).sort((x, y) => y[1] - x[1])[0]?.[0] || champs[0].n;
+    setResult({ wins, losses: 18 - wins, avg: Math.round(avg), hasWilt, wilt, games, mvpName });
+    setPhase('result');
+    setOpenGame(null);
+  }
+
+  function restart() {
+    setRoster({ Top: null, Jungle: null, Mid: null, ADC: null, Support: null });
+    setRoll(null);
+    setResult(null);
+    setOpenGame(null);
+    setPhase('draft');
+  }
+
+  return (
+    <div className="min-h-screen w-full bg-[radial-gradient(60%_50%_at_50%_0%,rgba(56,189,248,0.10),transparent),radial-gradient(50%_40%_at_80%_10%,rgba(250,204,21,0.08),transparent)] bg-slate-950">
+      <div className="mx-auto max-w-5xl px-4 py-8 sm:py-12">
+
+        <ChallengeBanner challenge={challenge} onDismiss={() => setChallenge(null)} />
+
+        {/* Header */}
+        <header className="mb-8 text-center">
+          <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-amber-400/30 bg-amber-400/5 px-4 py-1 text-xs font-semibold uppercase tracking-[0.25em] text-amber-300">
+            <Flame className="h-3.5 w-3.5" /> Broken Patch Edition
+          </div>
+          <h1 className="bg-gradient-to-r from-amber-200 via-yellow-400 to-sky-300 bg-clip-text text-4xl font-bold tracking-tight text-transparent sm:text-6xl drop-shadow-[0_2px_20px_rgba(250,204,21,0.25)]">
+            DRAFT SIMULATOR
+          </h1>
+          <p className="mt-2 text-sm font-medium tracking-wide text-slate-400 sm:text-base">
+            Roll broken patches. Draft historic champions. Force the <span className="font-bold text-amber-300">18-0 split.</span>
+          </p>
+        </header>
+
+        {/* Roster board */}
+        <section className="mb-6">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="flex items-center gap-2 text-sm font-bold uppercase tracking-widest text-slate-300">
+              <Shield className="h-4 w-4 text-sky-400" /> Your Roster
+            </h2>
+            <span className="rounded-full border border-slate-700 bg-slate-900/60 px-3 py-1 text-xs font-bold text-slate-300">
+              {filled} / 5 locked
+            </span>
+          </div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+            {ROLES.map((role) => (
+              <RosterSlot key={role.id} role={role} champ={roster[role.id]} />
+            ))}
+          </div>
+        </section>
+
+        {/* ---------- DRAFT PHASE ---------- */}
+        {phase === 'draft' && (
+          <section className="rounded-3xl border border-slate-800 bg-slate-900/40 p-5 backdrop-blur-sm sm:p-6">
+            {!complete ? (
+              <>
+                <div className="flex flex-col items-center gap-4">
+                  <button
+                    onClick={rollPatch}
+                    className="group relative inline-flex items-center gap-3 overflow-hidden rounded-2xl bg-gradient-to-r from-sky-500 to-blue-600 px-7 py-3.5 text-base font-bold uppercase tracking-wide text-white shadow-lg shadow-sky-500/30 transition-all hover:scale-[1.03] hover:shadow-sky-500/50 active:scale-95">
+                    <Dices className="h-5 w-5 transition-transform group-hover:rotate-12" />
+                    Roll Balance Patch
+                    <span className="absolute inset-0 -translate-x-full bg-white/20 transition-transform duration-500 group-hover:translate-x-full" />
+                  </button>
+                  {!roll && (
+                    <p className="text-center text-sm text-slate-500">
+                      Click to roll a random era and reveal three champions for your empty roles.
+                    </p>
+                  )}
+                </div>
+
+                {roll && (
+                  <div className="mt-6">
+                    {/* Era banner */}
+                    <div className="mb-4 rounded-2xl border border-amber-400/20 bg-gradient-to-r from-amber-500/10 to-transparent p-4">
+                      <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-amber-300">
+                        <Zap className="h-3.5 w-3.5" /> Patch rolled · {roll.era.year}
+                      </div>
+                      <div className="mt-1 text-xl font-bold text-amber-100">{roll.era.name}</div>
+                      <div className="text-sm italic text-slate-400">{roll.era.blurb}</div>
+                    </div>
+
+                    {/* Champion choices */}
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      {roll.options.map((champ, idx) => {
+                        const role = ROLE_MAP[champ.r];
+                        return (
+                          <button
+                            key={idx}
+                            onClick={() => lockIn(champ)}
+                            className={`group relative flex flex-col items-center gap-3 rounded-2xl border bg-slate-900/70 p-4 text-center transition-all hover:scale-[1.03] hover:bg-slate-900 hover:ring-2 ${role.ring}
+                              ${champ.w ? 'border-yellow-300/50 shadow-lg shadow-yellow-400/10' : 'border-slate-700'}`}>
+                            {champ.w && (
+                              <span className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-full bg-yellow-400/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-yellow-300 ring-1 ring-yellow-300/40 pulse-glow">
+                                <Crown className="h-3 w-3" /> Wilt Tier
+                              </span>
+                            )}
+                            <Avatar champ={champ} size="lg" />
+                            <div>
+                              <div className="text-base font-bold leading-tight">{champ.n}</div>
+                              <div className={`mt-0.5 text-[11px] font-semibold uppercase tracking-widest ${role.text}`}>{champ.r}</div>
+                            </div>
+                            <div className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-sm font-bold ${ratingTone(champ.p)}`}>
+                              {champ.p} <span className="text-[10px] font-medium opacity-70">PWR</span>
+                            </div>
+                            <p className="text-xs leading-snug text-slate-400">{champ.t}</p>
+                            <span className="mt-1 inline-flex items-center gap-1 rounded-lg bg-slate-800 px-3 py-1 text-xs font-bold text-slate-200 opacity-0 transition group-hover:opacity-100">
+                              <Lock className="h-3 w-3" /> Lock into {champ.r}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <p className="mt-3 text-center text-xs text-slate-500">
+                      Pick one to lock its role — or roll again for a different patch.
+                    </p>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="flex flex-col items-center gap-4 py-2">
+                <div className="text-center">
+                  <div className="text-sm font-semibold uppercase tracking-widest text-emerald-300">Roster complete</div>
+                  <div className="text-sm text-slate-400">Average power rating: <span className="font-bold text-slate-200">{Math.round(ROLES.reduce((s, r) => s + roster[r.id].p, 0) / 5)}</span></div>
+                </div>
+                <button
+                  onClick={simulate}
+                  className="group relative inline-flex items-center gap-3 overflow-hidden rounded-2xl bg-gradient-to-r from-amber-400 to-yellow-600 px-8 py-4 text-lg font-extrabold uppercase tracking-wide text-slate-950 shadow-xl shadow-amber-500/30 transition-all hover:scale-[1.03] hover:shadow-amber-400/50 active:scale-95">
+                  <Trophy className="h-6 w-6 transition-transform group-hover:-rotate-12" />
+                  Simulate 18-0 Split
+                  <span className="absolute inset-0 -translate-x-full bg-white/30 transition-transform duration-500 group-hover:translate-x-full" />
+                </button>
+                <button onClick={restart} className="text-xs font-semibold uppercase tracking-widest text-slate-500 transition hover:text-slate-300">
+                  Reset roster
+                </button>
+              </div>
+            )}
+          </section>
+        )}
+
+        {/* ---------- RESULT PHASE ---------- */}
+        {phase === 'result' && result && (
+          <ResultPanel result={result} roster={roster} challenge={challenge} openGame={openGame} setOpenGame={setOpenGame} restart={restart} />
+        )}
+
+        <footer className="mt-8 text-center text-[11px] uppercase tracking-widest text-slate-600">
+          Not affiliated with Riot Games · A parody draft sim · All ratings are jokes
+        </footer>
+      </div>
+    </div>
+  );
+}
+
+// ---- result panel ----------------------------------------------------------
+function ResultPanel({ result, roster, challenge, openGame, setOpenGame, restart }) {
+  const { wins, losses, avg, hasWilt, wilt, games, mvpName } = result;
+  const swept = losses === 0;
+  const winRate = Math.round((wins / 18) * 100);
+
+  // Challenge comparison (if the player arrived via a friend's link)
+  const cName = challenge ? (challenge.n || 'Your friend') : null;
+  const cw = challenge ? challenge.rec[0] : null;
+  const cl = challenge ? challenge.rec[1] : null;
+  const verdict = challenge ? (wins > cw ? 'win' : wins === cw ? 'tie' : 'loss') : null;
+
+  // Share-a-challenge state
+  const [shareName, setShareName] = useState('');
+  const [copied, setCopied] = useState(false);
+  const shareUrl = `${shareBaseUrl()}#c=${encodeURIComponent(encodeChallenge(roster, result, shareName))}`;
+  function copyLink() {
+    const done = () => { setCopied(true); setTimeout(() => setCopied(false), 1800); };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(shareUrl).then(done).catch(() => {
+        const el = document.getElementById('share-url-input'); if (el) { el.select(); document.execCommand('copy'); done(); }
+      });
+    } else {
+      const el = document.getElementById('share-url-input'); if (el) { el.select(); document.execCommand('copy'); done(); }
+    }
+  }
+
+  return (
+    <section className="space-y-5">
+      {/* Verdict card */}
+      <div className={`relative overflow-hidden rounded-3xl border p-6 text-center sm:p-8
+        ${swept ? 'border-yellow-300/40 bg-gradient-to-br from-yellow-500/10 via-amber-500/5 to-transparent shadow-2xl shadow-yellow-400/10'
+                : 'border-slate-800 bg-slate-900/50'}`}>
+        {swept && <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(40%_60%_at_50%_0%,rgba(250,204,21,0.18),transparent)]" />}
+        <div className="relative">
+          <div className="mb-2 flex items-center justify-center gap-2 text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">
+            <Activity className="h-4 w-4" /> Final Split Record
+          </div>
+          <div className={`text-6xl font-black tracking-tight sm:text-8xl ${swept ? 'bg-gradient-to-r from-yellow-200 to-amber-400 bg-clip-text text-transparent drop-shadow-[0_2px_30px_rgba(250,204,21,0.4)]' : 'text-slate-100'}`}>
+            {wins}-{losses}
+          </div>
+          <div className="mt-2 text-sm font-medium text-slate-400">
+            {winRate}% win rate · roster avg <span className="font-bold text-slate-200">{avg}</span> PWR
+          </div>
+
+          {challenge && (
+            <div className={`mx-auto mt-4 flex max-w-xl items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-sm font-bold
+              ${verdict === 'win' ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-200'
+                : verdict === 'tie' ? 'border-sky-400/40 bg-sky-500/10 text-sky-200'
+                : 'border-rose-400/40 bg-rose-500/10 text-rose-200'}`}>
+              {verdict === 'win' ? <Trophy className="h-4 w-4" /> : verdict === 'tie' ? <HeartHandshake className="h-4 w-4" /> : <Skull className="h-4 w-4" />}
+              {verdict === 'win'
+                ? `You beat ${cName}'s ${cw}-${cl}!`
+                : verdict === 'tie'
+                ? `Dead even with ${cName} at ${cw}-${cl}.`
+                : `${cName}'s ${cw}-${cl} still stands — run it back.`}
+            </div>
+          )}
+
+          {hasWilt && (
+            <div className="mx-auto mt-5 max-w-xl rounded-2xl border border-yellow-300/40 bg-yellow-400/10 p-4 text-left">
+              <div className="flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-yellow-300">
+                <TriangleAlert className="h-4 w-4" /> Simulation Overflow Detected
+              </div>
+              <p className="mt-1 text-sm text-yellow-100/90">
+                <span className="font-bold">{wilt.n}</span> is <span className="font-bold">Wilt Chamberlain Tier (99)</span>.
+                The hidden +15% win multiplier exceeded 100% and broke the math —
+                the rest of the roster became statistically irrelevant. <span className="font-bold">Free 18-0.</span>
+              </p>
+            </div>
+          )}
+
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-3 text-sm">
+            <span className="inline-flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-900/60 px-3 py-1.5 font-semibold text-slate-200">
+              <Star className="h-4 w-4 text-amber-300" /> Split MVP: {mvpName}
+            </span>
+            <span className="inline-flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-900/60 px-3 py-1.5 font-semibold text-slate-200">
+              {swept ? <Trophy className="h-4 w-4 text-yellow-300" /> : <Skull className="h-4 w-4 text-rose-400" />}
+              {swept ? 'Perfect Season' : `${losses} bad game${losses === 1 ? '' : 's'}`}
+            </span>
+          </div>
+
+          <button
+            onClick={restart}
+            className="mt-6 inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-sky-500 to-blue-600 px-6 py-3 text-sm font-bold uppercase tracking-wide text-white shadow-lg shadow-sky-500/30 transition hover:scale-[1.03] active:scale-95">
+            <RotateCcw className="h-4 w-4" /> New Draft
+          </button>
+        </div>
+      </div>
+
+      {/* Challenge a friend */}
+      <div className="rounded-3xl border border-fuchsia-500/20 bg-gradient-to-br from-fuchsia-500/5 to-transparent p-4 sm:p-5">
+        <h3 className="flex items-center gap-2 text-sm font-bold uppercase tracking-widest text-fuchsia-200">
+          <Users className="h-4 w-4 text-fuchsia-400" /> Challenge a Friend
+        </h3>
+        <p className="mt-1 text-sm text-slate-400">
+          Send this link — it loads your exact roster and <span className="font-semibold text-slate-200">{wins}-{losses}</span> record for them to beat. No sign-up required.
+        </p>
+        <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+          <input
+            value={shareName}
+            onChange={(e) => setShareName(e.target.value)}
+            maxLength={24}
+            placeholder="Your name (optional)"
+            className="flex-1 rounded-xl border border-slate-700 bg-slate-950/60 px-3 py-2.5 text-sm text-slate-100 placeholder-slate-500 outline-none transition focus:border-fuchsia-400/50 focus:ring-2 focus:ring-fuchsia-400/20"
+          />
+          <button
+            onClick={copyLink}
+            className={`inline-flex items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold uppercase tracking-wide text-white shadow-lg transition hover:scale-[1.02] active:scale-95
+              ${copied ? 'bg-emerald-600 shadow-emerald-500/30' : 'bg-gradient-to-r from-fuchsia-500 to-purple-600 shadow-fuchsia-500/30'}`}>
+            {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+            {copied ? 'Copied!' : 'Copy challenge link'}
+          </button>
+        </div>
+        <input
+          id="share-url-input"
+          readOnly
+          value={shareUrl}
+          onFocus={(e) => e.target.select()}
+          className="mt-2 w-full truncate rounded-xl border border-slate-800 bg-slate-950/60 px-3 py-2 font-mono text-xs text-slate-500 outline-none"
+        />
+      </div>
+
+      {/* Drafted roster strip */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+        {ROLES.map((role) => (
+          <RosterSlot key={role.id} role={role} champ={roster[role.id]} />
+        ))}
+      </div>
+
+      {/* Interactive game log */}
+      <div className="rounded-3xl border border-slate-800 bg-slate-900/40 p-4 sm:p-5">
+        <h3 className="mb-3 flex items-center gap-2 text-sm font-bold uppercase tracking-widest text-slate-300">
+          <Activity className="h-4 w-4 text-sky-400" /> Game Log
+          <span className="ml-auto text-[11px] font-medium normal-case tracking-normal text-slate-500">tap a game for details</span>
+        </h3>
+        <div className="grid gap-1.5">
+          {games.map((g) => {
+            const isOpen = openGame === g.i;
+            return (
+              <div key={g.i} className={`rounded-xl border transition-colors ${g.win ? 'border-emerald-500/20 bg-emerald-500/5' : 'border-rose-500/20 bg-rose-500/5'}`}>
+                <button
+                  onClick={() => setOpenGame(isOpen ? null : g.i)}
+                  className="flex w-full items-center gap-3 px-3 py-2 text-left">
+                  <span className="w-7 text-center text-xs font-bold text-slate-500">{g.i}</span>
+                  <span className={`grid h-7 w-7 place-items-center rounded-lg text-xs font-black ${g.win ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'}`}>
+                    {g.win ? 'W' : 'L'}
+                  </span>
+                  <span className="text-sm font-semibold text-slate-300">vs <span className="text-slate-100">{g.opp}</span></span>
+                  <span className="ml-auto flex items-center gap-2">
+                    <Avatar champ={g.mvp} size="sm" />
+                    <ChevronDown className={`h-4 w-4 text-slate-500 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                  </span>
+                </button>
+                {isOpen && (
+                  <div className="border-t border-slate-800/80 px-3 py-3 text-sm">
+                    <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-slate-400">
+                      <span><span className="text-slate-500">Result:</span> <span className={g.win ? 'font-bold text-emerald-300' : 'font-bold text-rose-300'}>{g.win ? 'Victory' : 'Defeat'}</span></span>
+                      <span><span className="text-slate-500">Duration:</span> <span className="font-semibold text-slate-200">{g.dur}</span></span>
+                      <span><span className="text-slate-500">MVP:</span> <span className="font-semibold text-slate-200">{g.mvp.n}</span> ({g.mvp.r})</span>
+                      <span><span className="text-slate-500">KDA:</span> <span className="font-mono font-semibold text-slate-200">{g.kda}</span></span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+createRoot(document.getElementById('root')).render(<DraftSimulator />);
+  </script>
+</body>
+</html>
